@@ -2,16 +2,14 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
+import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { QuoteTrigger } from "@/components/QuoteModal";
 
 const navigation = [
   { label: "Inicio", href: "/" },
-  { label: "Cómo te ayudamos", href: "/soluciones" },
-  { label: "Cómo funciona", href: "/como-funciona" },
-  { label: "Nosotros", href: "/nosotros" },
-  { label: "Preguntas frecuentes", href: "/preguntas-frecuentes" },
+  { label: "Seguimiento", href: "/app" },
   { label: "Contacto", href: "/contacto" },
 ];
 
@@ -34,6 +32,11 @@ export default function Navbar() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [isMenuOpen]);
 
+  // No mostrar Navbar en sistema privado (/app)
+  if (pathname.startsWith("/app")) {
+    return null;
+  }
+
   return (
     <header className="sticky top-0 z-50 border-b border-[var(--border)] bg-[rgba(247,249,252,0.9)] backdrop-blur-md">
       <nav
@@ -44,9 +47,14 @@ export default function Navbar() {
           href="/"
           className="shrink-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue)] focus-visible:ring-offset-2"
         >
-          <span className="font-display text-[1.7rem] font-black tracking-[-0.08em] text-[var(--navy)] sm:text-[1.9rem]">
-            AXESSIA
-          </span>
+          <Image
+            src="/images/logo-axessia.png"
+            alt="Logo AXESSIA"
+            width={140}
+            height={46}
+            priority
+            className="h-[2.875rem] w-auto"
+          />
         </Link>
 
         <div className="hidden items-center gap-5 lg:flex">
@@ -76,7 +84,7 @@ export default function Navbar() {
             );
           })}
           <Link
-            href="/app"
+            href="/ingresar"
             className="whitespace-nowrap rounded-lg px-1 py-2 text-[0.78rem] font-semibold text-[var(--navy)] transition-colors hover:text-[var(--blue)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue)] focus-visible:ring-offset-2"
           >
             Ingresar
@@ -137,7 +145,7 @@ export default function Navbar() {
                 );
               })}
               <Link
-                href="/app"
+                href="/ingresar"
                 className="rounded-xl px-4 py-3 text-sm font-semibold text-[var(--navy)] transition-colors hover:bg-[var(--background)] hover:text-[var(--blue)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue)]"
               >
                 Ingresar al sistema

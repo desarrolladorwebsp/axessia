@@ -1,0 +1,93 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+enum QuoteRequestStatus {
+  RECEIVED
+  REVIEWING
+  QUOTED
+  APPROVED
+  PROCESSING
+  DELIVERED
+}
+
+enum UserRole {
+  EJECUTIVO
+  ADMINISTRADOR
+}
+
+model User {
+  id        String    @id @default(cuid())
+  firstName String
+  lastName  String
+  email     String    @unique
+  rut       String    @unique
+  role      UserRole  @default(EJECUTIVO)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Customer {
+  id                 String         @id @default(cuid())
+  name               String
+  phone              String
+  email              String         @unique
+  rut                String         @unique
+  city               String
+  passwordHash       String?
+  hasPendingRequest  Boolean        @default(false)
+  promotionsConsent  Boolean        @default(false)
+  createdAt          DateTime       @default(now())
+  updatedAt          DateTime       @updatedAt
+  requests           QuoteRequest[]
+}
+
+model QuoteRequest {
+  sequence             Int               @id @default(autoincrement())
+  id                   String            @unique @default(cuid())
+  requestNumber        String?           @unique
+  customerId           String
+  patientName          String?
+  patientRut           String?
+  status               QuoteRequestStatus @default(RECEIVED)
+  price                Decimal?          @db.Decimal(12, 2)
+  acceptsPolicies      Boolean
+  acceptsDataTreatment Boolean
+  createdAt            DateTime          @default(now())
+  updatedAt            DateTime          @updatedAt
+  customer             Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  prescription         Prescription?
+  medications          Medication[]
+
+  @@index([customerId])
+  @@index([status])
+}
+
+model Prescription {
+  id           String       @id @default(cuid())
+  requestId    String       @unique
+  fileName     String
+  mimeType     String
+  fileSize     Int
+  storageKey   String?
+  createdAt    DateTime     @default(now())
+  request      QuoteRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+}
+
+model Medication {
+  id                 String       @id @default(cuid())
+  requestId          String
+  commercialName     String
+  activeIngredient   String
+  concentration     String
+  tabletQuantity     Int
+  createdAt          DateTime     @default(now())
+  request            QuoteRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+}

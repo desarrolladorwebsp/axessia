@@ -29,6 +29,8 @@ type FormValues = {
   rut: string;
   city: string;
   file: File | null;
+  patientName: string;
+  patientRut: string;
 };
 
 type QuoteModalContextValue = {
@@ -52,6 +54,8 @@ const initialValues: FormValues = {
   rut: "",
   city: "",
   file: null,
+  patientName: "",
+  patientRut: "",
 };
 
 export function QuoteModalProvider({ children }: { children: ReactNode }) {
@@ -64,6 +68,9 @@ export function QuoteModalProvider({ children }: { children: ReactNode }) {
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [currentStep, setCurrentStep] = useState(1);
   const [consents, setConsents] = useState({ policies: false, data: false });
+  const [generatedRequestNumber, setGeneratedRequestNumber] = useState("");
+  const [differentPatient, setDifferentPatient] = useState(false);
+  const [submissionError, setSubmissionError] = useState("");
 
   useEffect(() => {
     if (!isOpen) return;
@@ -85,6 +92,8 @@ export function QuoteModalProvider({ children }: { children: ReactNode }) {
     setIsOpen(true);
     setIsSubmitted(false);
     setCurrentStep(1);
+    setSubmissionError("");
+    setGeneratedRequestNumber("");
   };
 
   const closeQuoteModal = () => {
@@ -134,6 +143,8 @@ export function QuoteModalProvider({ children }: { children: ReactNode }) {
       if (!values[field].trim()) nextErrors[field] = message;
     });
     if (values.email && !/^\S+@\S+\.\S+$/.test(values.email)) nextErrors.email = "Revisa el formato del correo.";
+    if (differentPatient && !values.patientName.trim()) nextErrors.patientName = "Ingresa el nombre del paciente.";
+    if (differentPatient && !values.patientRut.trim()) nextErrors.patientRut = "Ingresa el RUT del paciente.";
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -172,9 +183,34 @@ export function QuoteModalProvider({ children }: { children: ReactNode }) {
     if (!validate() || !validateConsents()) return;
 
     setIsSubmitting(true);
-    await new Promise((resolve) => setTimeout(resolve, 700));
-    setIsSubmitting(false);
-    setIsSubmitted(true);
+    setSubmissionError("");
+    try {
+      const response = await fetch("/api/quote-requests", {
+        body: JSON.stringify({
+          customer: { name: values.name, phone: values.phone, email: values.email, rut: values.rut, city: values.city },
+          patient: differentPatient ? { name: values.patientName, rut: values.patientRut } : undefined,
+          prescription: values.file ? { fileName: values.file.name, mimeType: values.file.type, fileSize: values.file.size } : undefined,
+          medications: products.map((product) => ({
+            commercialName: product.name,
+            activeIngredient: product.activeIngredient,
+            concentration: product.concentration,
+            tabletQuantity: Number(product.quantity),
+          })),
+          acceptsPolicies: consents.policies,
+          acceptsDataTreatment: consents.data,
+        }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
+      });
+      if (!response.ok) throw new Error("No fue posible guardar la solicitud.");
+      const result = (await response.json()) as { requestNumber?: string };
+      setGeneratedRequestNumber(result.requestNumber ?? "");
+      setIsSubmitted(true);
+    } catch (error) {
+      setSubmissionError(error instanceof Error ? error.message : "No fue posible guardar la solicitud.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const addProduct = () => setProducts((current) => [...current, emptyProduct(Date.now())]);
@@ -226,6 +262,7 @@ export function QuoteModalProvider({ children }: { children: ReactNode }) {
                 <motion.div className="quote-success" initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }}>
                   <FileCheck2 size={38} aria-hidden="true" />
                   <h3>Recibimos tu solicitud</h3>
+                  {generatedRequestNumber && <strong className="quote-request-number">ID de solicitud: {generatedRequestNumber}</strong>}
                   <p>Tu información quedó preparada para ser revisada por nuestro equipo.</p>
                   <button type="button" className="quote-primary-button" onClick={closeQuoteModal}>Cerrar</button>
                 </motion.div>
@@ -241,6 +278,14 @@ export function QuoteModalProvider({ children }: { children: ReactNode }) {
                       <Field label="RUT" placeholder="Ej: 12.345.678-9" id="quote-rut" value={values.rut} error={errors.rut} onChange={(value) => updateValue("rut", value)} />
                       <Field label="Ciudad" placeholder="Ej: Santiago" id="quote-city" value={values.city} error={errors.city} onChange={(value) => updateValue("city", value)} />
                     </div>
+                    <label className="quote-patient-toggle" htmlFor="different-patient">
+                      <input id="different-patient" type="checkbox" checked={differentPatient} onChange={(event) => setDifferentPatient(event.target.checked)} />
+                      <span>La receta es para otra persona</span>
+                    </label>
+                    {differentPatient && <div className="quote-fields-grid quote-patient-fields">
+                      <Field label="Nombre del paciente" placeholder="Ej: Pedro Pérez" id="quote-patient-name" value={values.patientName} error={errors.patientName} onChange={(value) => updateValue("patientName", value)} />
+                      <Field label="RUT del paciente" placeholder="Ej: 12.345.678-9" id="quote-patient-rut" value={values.patientRut} error={errors.patientRut} onChange={(value) => updateValue("patientRut", value)} />
+                    </div>}
                     <StepButton onClick={goToNextStep}>Continuar <ArrowRight size={17} aria-hidden="true" /></StepButton>
                   </motion.div>}
 
@@ -287,6 +332,7 @@ export function QuoteModalProvider({ children }: { children: ReactNode }) {
                       <ReviewRow label="Cliente" value={values.name} onEdit={() => setCurrentStep(1)} />
                       <ReviewRow label="Contacto" value={`${values.email} · ${values.phone}`} onEdit={() => setCurrentStep(1)} />
                       <ReviewRow label="Ubicación" value={`${values.city} · ${values.rut}`} onEdit={() => setCurrentStep(1)} />
+                      {differentPatient && <ReviewRow label="Paciente" value={`${values.patientName} · ${values.patientRut}`} onEdit={() => setCurrentStep(1)} />}
                       <ReviewRow label="Receta" value={values.file?.name ?? "Sin archivo"} onEdit={() => setCurrentStep(2)} />
                       <ReviewRow label="Productos" value={`${products.length} ${products.length === 1 ? "producto" : "productos"}`} onEdit={() => setCurrentStep(2)} />
                     </div>
@@ -309,6 +355,7 @@ export function QuoteModalProvider({ children }: { children: ReactNode }) {
                       </Consent>
                     </div>
                     <div className="quote-step-hint">Al enviar, tu información quedará preparada para revisión de nuestro equipo. No se realiza ningún cobro en este paso.</div>
+                    {submissionError && <p className="quote-submit-error">{submissionError}</p>}
                     <div className="quote-step-actions"><StepButton variant="secondary" onClick={() => setCurrentStep(2)}><ArrowLeft size={17} aria-hidden="true" /> Atrás</StepButton><button type="submit" className="quote-primary-button" disabled={isSubmitting}>{isSubmitting ? <><LoaderCircle className="quote-spinner" size={17} aria-hidden="true" /> Preparando...</> : <>Enviar solicitud <ArrowRight size={17} aria-hidden="true" /></>}</button></div>
                   </motion.div>}
 

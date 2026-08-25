@@ -1,0 +1,25 @@
+.app-system {
+  font-family: var(--font-sans);
+}
+
+.app-main-content {
+  transition: margin-left 0.3s ease;
+}
+
+.app-content {
+  padding: 2rem;
+}
+
+@media (max-width: 767px) {
+  .app-system {
+    flex-direction: column;
+  }
+
+  .app-main-content {
+    margin-top: 0;
+  }
+
+  .app-content {
+    padding: 1.5rem 1rem;
+  }
+}

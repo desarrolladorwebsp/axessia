@@ -1,5 +1,5 @@
-import SectionPlaceholder from "@/components/SectionPlaceholder";
+import { redirect } from "next/navigation";
 
 export default function AppPage() {
-  return <SectionPlaceholder title="Acceso al sistema" />;
+  redirect("/app/dashboard");
 }

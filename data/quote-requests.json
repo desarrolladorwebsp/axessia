@@ -1,0 +1,44 @@
+[
+  {
+    "id": "dev-1787702151232",
+    "sequence": 1,
+    "requestNumber": "S-100001",
+    "customerId": "dev-customer-1787702151232",
+    "patientName": null,
+    "patientRut": null,
+    "status": "RECEIVED",
+    "price": null,
+    "acceptsPolicies": true,
+    "acceptsDataTreatment": true,
+    "createdAt": "2026-08-25T23:55:51.232Z",
+    "updatedAt": "2026-08-25T23:55:51.232Z",
+    "customer": {
+      "id": "dev-customer-1787702151232",
+      "name": "Alfredo",
+      "phone": "+56921629730",
+      "email": "alfredocl2019@gmail.com",
+      "rut": "25684045-6",
+      "city": "santiago"
+    },
+    "prescription": {
+      "id": "dev-prescription-1787702151232",
+      "requestId": "dev-1787702151232",
+      "fileName": "bg-operationes.png",
+      "mimeType": "image/png",
+      "fileSize": 1735489,
+      "storageKey": null,
+      "createdAt": "2026-08-25T23:55:51.232Z"
+    },
+    "medications": [
+      {
+        "id": "dev-med-1787702151232-0",
+        "requestId": "dev-1787702151232",
+        "commercialName": "producto",
+        "activeIngredient": "principio",
+        "concentration": "500",
+        "tabletQuantity": 30,
+        "createdAt": "2026-08-25T23:55:51.232Z"
+      }
+    ]
+  }
+]

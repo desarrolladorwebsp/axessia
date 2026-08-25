@@ -6,7 +6,7 @@ export default function Home() {
   return (
     <>
       <main className="hero-home relative isolate min-h-[calc(100vh-92px)] overflow-hidden">
-        <div className="mx-auto flex min-h-[calc(100vh-92px)] max-w-[1440px] items-center px-5 py-20 sm:px-8 lg:px-12">
+        <div className="mx-auto flex min-h-[calc(100vh-92px)] max-w-[1440px] items-start sm:items-center px-5 py-20 sm:px-8 lg:px-12">
           <div className="hero-copy relative z-10 max-w-xl pb-24 sm:pb-32 lg:max-w-[600px]">
           <p className="text-xs font-bold uppercase tracking-[0.42em] text-[var(--blue)] sm:text-sm">
             Acceso inteligente
