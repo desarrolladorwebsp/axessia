@@ -25,9 +25,8 @@ const steps = [
   },
   {
     number: "03",
-    title: "Cotizamos en hasta 48 h",
+    title: "Cotizamos tu solicitud",
     description: "Buscamos y evaluamos. Te enviamos el valor.",
-    badge: "Respuesta en hasta 48 horas",
   },
   {
     number: "04",
@@ -123,7 +122,6 @@ export default function OperationsProcess() {
               <span className="step-dot" aria-hidden="true" />
               <h3>{step.title}</h3>
               <p>{step.description}</p>
-              {step.badge && <span className="step-badge">{step.badge}</span>}
             </motion.li>
           ))}
         </motion.ol>

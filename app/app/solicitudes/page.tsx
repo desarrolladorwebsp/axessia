@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
 import { SkeletonTable } from "../components/Skeletons";
 import { EmptyState, ErrorState } from "../components/States";
@@ -53,6 +54,7 @@ const statusColors: Record<string, string> = {
 };
 
 export default function SolicitudesPage() {
+  const router = useRouter();
   const [data, setData] = useState<PaginationData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -82,22 +84,25 @@ export default function SolicitudesPage() {
   }, []);
 
   return (
-    <div className="max-w-7xl mx-auto p-6">
-      <div className="mb-8 flex items-center justify-between gap-4">
+    <div className="w-full px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mb-6 flex flex-col gap-4 border-b border-[var(--border)] pb-5 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-bold font-display text-[var(--navy)]">
+          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--blue)]">
+            Gestión
+          </p>
+          <h1 className="mt-2 text-2xl font-bold font-display text-[var(--navy)] sm:text-3xl">
             Solicitudes
           </h1>
-          <p className="text-[var(--text-secondary)] mt-2">
+          <p className="mt-1 text-sm text-[var(--text-secondary)]">
             Listado de solicitudes recibidas desde la web
           </p>
         </div>
 
         <Link
           href="/"
-          className="inline-flex items-center gap-2 rounded-lg px-6 py-3 text-sm font-bold text-white bg-gradient-to-r from-[var(--cyan)] to-[var(--blue)] shadow-[0_12px_28px_rgba(8,127,213,0.25)] hover:shadow-[0_16px_36px_rgba(8,127,213,0.35)] transition-shadow"
+          className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-3 text-sm font-bold text-white bg-gradient-to-r from-[var(--cyan)] to-[var(--blue)] shadow-[0_12px_28px_rgba(8,127,213,0.25)] transition-all hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(8,127,213,0.35)]"
         >
-          <Plus className="w-5 h-5" />
+          <Plus className="w-4 h-4" />
           Nueva solicitud
         </Link>
       </div>
@@ -119,6 +124,7 @@ export default function SolicitudesPage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.3 }}
+          className="w-full"
         >
           {data.quotes.length === 0 ? (
             <EmptyState
@@ -126,38 +132,47 @@ export default function SolicitudesPage() {
               description="Aún no hay solicitudes registradas en la base de datos"
             />
           ) : (
-            <div className="bg-white rounded-2xl border border-[var(--border)] shadow-sm overflow-hidden">
+            <div className="w-full overflow-hidden rounded-2xl border border-[var(--border)] bg-white/80 backdrop-blur-sm">
               <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className="bg-[var(--background)] border-b border-[var(--border)]">
+                <table className="min-w-full w-full border-separate border-spacing-0">
+                  <thead className="bg-[var(--background)]">
                     <tr>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--navy)]"># Solicitud</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--navy)]">Cliente</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--navy)]">Medicamentos</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--navy)]">Estado</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--navy)]">Precio</th>
-                      <th className="px-6 py-4 text-left text-sm font-semibold text-[var(--navy)]">Fecha</th>
+                      <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--navy)] sm:px-4 lg:px-6"># Solicitud</th>
+                      <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--navy)] sm:px-4 lg:px-6">Cliente</th>
+                      <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--navy)] sm:px-4 lg:px-6">Medicamentos</th>
+                      <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--navy)] sm:px-4 lg:px-6">Estado</th>
+                      <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--navy)] sm:px-4 lg:px-6">Precio</th>
+                      <th className="px-3 py-3 text-left text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--navy)] sm:px-4 lg:px-6">Fecha</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-[var(--border)]">
+                  <tbody>
                     {data.quotes.map((request) => (
                       <motion.tr
                         key={request.id}
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ duration: 0.2 }}
-                        className="hover:bg-[var(--background)] transition-colors"
+                        role="link"
+                        tabIndex={0}
+                        onClick={() => router.push(`/app/solicitudes/${request.id}`)}
+                        onKeyDown={(event) => {
+                          if (event.key === "Enter" || event.key === " ") {
+                            event.preventDefault();
+                            router.push(`/app/solicitudes/${request.id}`);
+                          }
+                        }}
+                        className="cursor-pointer border-t border-[var(--border)] outline-none transition-colors hover:bg-[#E7EEF8] focus-visible:bg-[#E7EEF8] focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--blue)]"
                       >
-                        <td className="px-6 py-4 text-sm font-medium text-[var(--blue)]">
+                        <td className="px-3 py-4 text-sm font-semibold text-[var(--blue)] sm:px-4 lg:px-6">
                           {request.requestNumber ?? "Sin número"}
                         </td>
-                        <td className="px-6 py-4 text-sm">
-                          <div className="flex flex-col">
-                            <p className="font-medium text-[var(--navy)]">{request.customer.name}</p>
-                            <p className="text-xs text-[var(--text-secondary)]">{request.customer.email}</p>
+                        <td className="px-3 py-4 text-sm sm:px-4 lg:px-6">
+                          <div className="flex min-w-0 flex-col">
+                            <p className="truncate font-medium text-[var(--navy)]">{request.customer.name}</p>
+                            <p className="break-all text-xs text-[var(--text-secondary)]">{request.customer.email}</p>
                           </div>
                         </td>
-                        <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
+                        <td className="px-3 py-4 text-sm text-[var(--text-secondary)] sm:px-4 lg:px-6">
                           {request.medications.length > 0 ? (
                             <div className="space-y-1">
                               {request.medications.slice(0, 2).map((med, idx) => (
@@ -171,19 +186,19 @@ export default function SolicitudesPage() {
                             <span className="text-gray-400">-</span>
                           )}
                         </td>
-                        <td className="px-6 py-4 text-sm">
+                        <td className="px-3 py-4 text-sm sm:px-4 lg:px-6">
                           <span
-                            className={`inline-block px-3 py-1 rounded-full text-xs font-medium ${
+                            className={`inline-flex rounded-full px-2.5 py-1 text-[11px] font-semibold ${
                               statusColors[request.status] || "bg-gray-50 text-gray-700"
                             }`}
                           >
                             {statusLabels[request.status] || request.status}
                           </span>
                         </td>
-                        <td className="px-6 py-4 text-sm font-medium text-[var(--navy)]">
+                        <td className="px-3 py-4 text-sm font-semibold text-[var(--navy)] sm:px-4 lg:px-6">
                           {request.price ? `$${Number(request.price).toLocaleString()}` : "-"}
                         </td>
-                        <td className="px-6 py-4 text-sm text-[var(--text-secondary)]">
+                        <td className="px-3 py-4 text-sm text-[var(--text-secondary)] sm:px-4 lg:px-6">
                           {new Date(request.createdAt).toLocaleDateString("es-CL")}
                         </td>
                       </motion.tr>
@@ -193,7 +208,7 @@ export default function SolicitudesPage() {
               </div>
 
               {data.pagination.pages > 1 && (
-                <div className="flex items-center justify-between px-6 py-4 border-t border-[var(--border)] bg-[var(--background)]">
+                <div className="flex flex-col gap-3 border-t border-[var(--border)] bg-[var(--background)] px-3 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-4 lg:px-6">
                   <p className="text-sm text-[var(--text-secondary)]">
                     Página {data.pagination.page} de {data.pagination.pages} • Total: {data.pagination.total} solicitudes
                   </p>
@@ -201,17 +216,17 @@ export default function SolicitudesPage() {
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      className="p-2 rounded-lg border border-[var(--border)] text-[var(--navy)] hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="rounded-lg border border-[var(--border)] bg-white p-2 text-[var(--navy)] transition-colors hover:bg-[var(--background)] disabled:cursor-not-allowed disabled:opacity-50"
                       disabled={data.pagination.page === 1}
                     >
-                      <ChevronLeft className="w-4 h-4" />
+                      <ChevronLeft className="h-4 w-4" />
                     </button>
                     <button
                       type="button"
-                      className="p-2 rounded-lg border border-[var(--border)] text-[var(--navy)] hover:bg-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      className="rounded-lg border border-[var(--border)] bg-white p-2 text-[var(--navy)] transition-colors hover:bg-[var(--background)] disabled:cursor-not-allowed disabled:opacity-50"
                       disabled={data.pagination.page === data.pagination.pages}
                     >
-                      <ChevronRight className="w-4 h-4" />
+                      <ChevronRight className="h-4 w-4" />
                     </button>
                   </div>
                 </div>

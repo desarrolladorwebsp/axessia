@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowUp, ArrowUpRight, Clock3 } from "lucide-react";
+import { ArrowUp, ArrowUpRight } from "lucide-react";
 import { QuoteTrigger } from "@/components/QuoteModal";
 
 const steps = [
@@ -17,8 +17,8 @@ const steps = [
   },
   {
     number: "03",
-    title: "Te respondemos",
-    description: "Recibe la alternativa y el valor en hasta 48 horas.",
+    title: "Te cotizamos",
+    description: "Recibe la alternativa y el valor de tu solicitud.",
   },
 ];
 
@@ -46,10 +46,6 @@ export default function QuoteCallout() {
           </h2>
           <p className="quote-callout-description">
             Sube tu receta y buscamos las mejores alternativas disponibles para ti en Chile y el extranjero.
-          </p>
-          <p className="quote-response">
-            <Clock3 size={20} aria-hidden="true" />
-            Respuesta a tu solicitud en hasta <span>48 horas.</span>
           </p>
           <QuoteTrigger className="quote-callout-cta">
             <span className="quote-callout-cta-icon">

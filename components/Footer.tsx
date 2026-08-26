@@ -10,7 +10,7 @@ const navigation = [
   ["Inicio", "/"],
   ["Cómo funciona", "/como-funciona"],
   ["Importación para uso personal", "/soluciones"],
-  ["Seguimiento de solicitud", "/app"],
+  ["Seguimiento de solicitud", "/seguimiento"],
   ["Preguntas frecuentes", "/preguntas-frecuentes"],
   ["Contacto", "/contacto"],
 ];
