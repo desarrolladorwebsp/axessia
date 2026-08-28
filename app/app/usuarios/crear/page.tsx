@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowLeft, Loader2 } from "lucide-react";
+import { ArrowLeft, Loader2, UserPlus } from "lucide-react";
+import { PrimaryButton, SecondaryButton } from "../../components/Buttons";
 
 export default function CreateUserPage() {
   const router = useRouter();
@@ -55,43 +55,46 @@ export default function CreateUserPage() {
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <Link
-        href="/app/usuarios"
-        className="inline-flex items-center gap-2 text-[var(--blue)] hover:text-[var(--cyan)] font-medium mb-8 transition-colors"
-      >
-        <ArrowLeft className="w-4 h-4" />
+    <div className="mx-auto w-full max-w-2xl px-1 py-2 sm:px-2 lg:px-4">
+      <SecondaryButton href="/app/usuarios" icon={ArrowLeft} size="sm" className="mb-6 border-none px-0 text-[var(--blue)] hover:text-[var(--navy)]">
         Volver
-      </Link>
+      </SecondaryButton>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3 }}
-        className="bg-white rounded-2xl border border-[var(--border)] p-8 shadow-sm"
+        className="rounded-2xl border border-[var(--border)] bg-white p-6 shadow-[0_10px_30px_rgba(7,30,65,0.05)] sm:p-8"
       >
-        <h1 className="text-2xl font-bold font-display text-[var(--navy)] mb-2">
-          Crear Usuario Interno
-        </h1>
-        <p className="text-[var(--text-secondary)] mb-8">
-          Agrega un nuevo usuario al sistema de gestión
-        </p>
+        <div className="mb-8 flex items-start gap-3">
+          <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-[var(--purple)] text-[var(--purple)]">
+            <UserPlus className="h-5 w-5" />
+          </div>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--purple)]">Administración</p>
+            <h1 className="font-display text-2xl font-extrabold tracking-tight text-[var(--navy)]">
+              Crear usuario interno
+            </h1>
+            <p className="mt-1 text-xs text-[var(--text-secondary)]">
+              Agrega un nuevo usuario al sistema de gestión
+            </p>
+          </div>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">
           {error && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              className="p-4 rounded-lg bg-red-50 border border-red-200 text-red-700 text-sm"
+              className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700"
             >
               {error}
             </motion.div>
           )}
 
-          {/* Nombres */}
           <div className="grid grid-cols-2 gap-4 md:gap-6">
             <div>
-              <label className="block text-sm font-medium text-[var(--navy)] mb-2">
+              <label className="mb-2 block text-xs font-bold text-[var(--navy)]">
                 Nombre
               </label>
               <input
@@ -101,12 +104,12 @@ export default function CreateUserPage() {
                 onChange={handleChange}
                 required
                 placeholder="Juan"
-                className="w-full px-4 py-3 rounded-lg border border-[var(--border)] focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/20 outline-none transition-all"
+                className="w-full rounded-xl border border-[var(--border)] px-4 py-3 text-sm outline-none transition focus:border-[var(--blue)] focus:ring-4 focus:ring-[var(--blue)]/10"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-[var(--navy)] mb-2">
+              <label className="mb-2 block text-xs font-bold text-[var(--navy)]">
                 Apellido
               </label>
               <input
@@ -116,15 +119,14 @@ export default function CreateUserPage() {
                 onChange={handleChange}
                 required
                 placeholder="Pérez"
-                className="w-full px-4 py-3 rounded-lg border border-[var(--border)] focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/20 outline-none transition-all"
+                className="w-full rounded-xl border border-[var(--border)] px-4 py-3 text-sm outline-none transition focus:border-[var(--blue)] focus:ring-4 focus:ring-[var(--blue)]/10"
               />
             </div>
           </div>
 
-          {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-[var(--navy)] mb-2">
-              Correo Electrónico
+            <label className="mb-2 block text-xs font-bold text-[var(--navy)]">
+              Correo electrónico
             </label>
             <input
               type="email"
@@ -133,13 +135,12 @@ export default function CreateUserPage() {
               onChange={handleChange}
               required
               placeholder="juan@example.com"
-              className="w-full px-4 py-3 rounded-lg border border-[var(--border)] focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/20 outline-none transition-all"
+              className="w-full rounded-xl border border-[var(--border)] px-4 py-3 text-sm outline-none transition focus:border-[var(--blue)] focus:ring-4 focus:ring-[var(--blue)]/10"
             />
           </div>
 
-          {/* RUT */}
           <div>
-            <label className="block text-sm font-medium text-[var(--navy)] mb-2">
+            <label className="mb-2 block text-xs font-bold text-[var(--navy)]">
               RUT
             </label>
             <input
@@ -149,44 +150,33 @@ export default function CreateUserPage() {
               onChange={handleChange}
               required
               placeholder="12.345.678-K"
-              className="w-full px-4 py-3 rounded-lg border border-[var(--border)] focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/20 outline-none transition-all"
+              className="w-full rounded-xl border border-[var(--border)] px-4 py-3 text-sm outline-none transition focus:border-[var(--blue)] focus:ring-4 focus:ring-[var(--blue)]/10"
             />
           </div>
 
-          {/* Rol */}
           <div>
-            <label className="block text-sm font-medium text-[var(--navy)] mb-2">
+            <label className="mb-2 block text-xs font-bold text-[var(--navy)]">
               Rol
             </label>
             <select
               name="role"
               value={formData.role}
               onChange={handleChange}
-              className="w-full px-4 py-3 rounded-lg border border-[var(--border)] focus:border-[var(--blue)] focus:ring-2 focus:ring-[var(--blue)]/20 outline-none transition-all"
+              className="w-full rounded-xl border border-[var(--border)] px-4 py-3 text-sm outline-none transition focus:border-[var(--blue)] focus:ring-4 focus:ring-[var(--blue)]/10"
             >
               <option value="EJECUTIVO">Ejecutivo</option>
               <option value="ADMINISTRADOR">Administrador</option>
             </select>
           </div>
 
-          {/* Actions */}
-          <div className="flex gap-4 pt-6 border-t border-[var(--border)]">
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="flex-1 px-6 py-3 rounded-lg border border-[var(--border)] text-[var(--navy)] font-medium hover:bg-[var(--background)] transition-colors"
-            >
+          <div className="flex gap-4 border-t border-[var(--border)] pt-6">
+            <SecondaryButton type="button" onClick={() => router.back()} className="flex-1">
               Cancelar
-            </button>
+            </SecondaryButton>
 
-            <button
-              type="submit"
-              disabled={isLoading}
-              className="flex-1 inline-flex items-center justify-center gap-2 px-6 py-3 rounded-lg bg-gradient-to-r from-[var(--cyan)] to-[var(--blue)] text-white font-medium hover:shadow-[0_12px_28px_rgba(8,127,213,0.25)] transition-shadow disabled:opacity-60 disabled:cursor-not-allowed"
-            >
-              {isLoading && <Loader2 className="w-4 h-4 animate-spin" />}
-              {isLoading ? "Creando..." : "Crear Usuario"}
-            </button>
+            <PrimaryButton type="submit" disabled={isLoading} icon={isLoading ? Loader2 : undefined} className={`flex-1 ${isLoading ? "[&_svg]:animate-spin" : ""}`}>
+              {isLoading ? "Creando..." : "Crear usuario"}
+            </PrimaryButton>
           </div>
         </form>
       </motion.div>

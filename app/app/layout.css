@@ -7,7 +7,52 @@
 }
 
 .app-content {
-  padding: 2rem;
+  padding: 1.25rem;
+}
+
+.icon-button,
+.icon-button-small {
+  align-items: center;
+  border: 1px solid var(--border);
+  color: var(--text-secondary);
+  display: inline-flex;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.icon-button {
+  border-radius: 0.75rem;
+  height: 2.75rem;
+  width: 2.75rem;
+}
+
+.icon-button-small {
+  border-radius: 0.6rem;
+  height: 2rem;
+  width: 2rem;
+}
+
+.icon-button:hover,
+.icon-button-small:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+  background: rgba(8, 127, 213, 0.05);
+}
+
+.field-input {
+  width: 100%;
+  border-radius: 0.5rem;
+  border: 1px solid var(--border);
+  background: var(--white);
+  padding: 0.5rem 0.6rem;
+  font-size: 0.75rem;
+  color: var(--navy);
+  outline: none;
+  transition: border-color 0.2s ease;
+}
+
+.field-input:focus {
+  border-color: var(--blue);
 }
 
 @media (max-width: 767px) {
@@ -16,10 +61,17 @@
   }
 
   .app-main-content {
-    margin-top: 0;
+    margin-left: 0;
+    margin-top: 92px;
   }
 
   .app-content {
-    padding: 1.5rem 1rem;
+    padding: 1rem;
+  }
+}
+
+@media (min-width: 768px) {
+  .app-content {
+    padding: 2rem clamp(2rem, 4vw, 4.5rem);
   }
 }

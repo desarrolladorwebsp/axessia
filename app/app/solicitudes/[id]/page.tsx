@@ -1,171 +1,120 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { motion } from "framer-motion";
 import { useParams } from "next/navigation";
-import { ArrowLeft, ClipboardList, FileText, ReceiptText, UserRound } from "lucide-react";
+import { ArrowLeft, CalendarDays, Check, ClipboardList, Clock3, FileText, History, MessageSquare, ReceiptText, UserRound } from "lucide-react";
 import { ErrorState } from "../../components/States";
+import StatusBadge from "../../components/StatusBadge";
+import Avatar from "../../components/Avatar";
+import { PrimaryButton, SecondaryButton } from "../../components/Buttons";
+import CreateQuoteModal from "./CreateQuoteModal";
+import ViewQuoteModal, { quoteStatusLabels, quoteStatusTones, type QuoteDetail } from "./ViewQuoteModal";
 
-type RequestDetail = {
-  id: string;
-  requestNumber: string | null;
-  status: string;
-  price: number | null;
-  patientName: string | null;
-  patientRut: string | null;
-  createdAt: string;
-  customer: {
-    name: string;
-    email: string;
-    phone: string;
-    rut: string;
-    city: string;
-  };
-  prescription: {
-    fileName: string;
-    mimeType: string;
-    fileSize: number;
-  } | null;
-  medications: Array<{
-    id: string;
-    commercialName: string;
-    activeIngredient: string;
-    concentration: string;
-    tabletQuantity: number;
-  }>;
-};
+type RequestNote = { id: string; executiveName: string; message: string; createdAt: string };
+type RequestDetail = { id: string; requestNumber: string | null; status: string; price: number | null; patientName: string | null; patientRut: string | null; createdAt: string; updatedAt?: string; requesterName?: string | null; requesterEmail?: string | null; requesterPhone?: string | null; requesterRut?: string | null; requesterCity?: string | null; customer: { name: string; email: string; phone: string; rut: string; city: string } | null; prescription: { fileName: string; mimeType: string; fileSize: number; createdAt?: string } | null; medications: Array<{ id: string; commercialName: string; activeIngredient: string; concentration: string; tabletQuantity: number }>; internalNotes: RequestNote[]; quotes: QuoteDetail[] };
 
-const statusLabels: Record<string, string> = {
-  RECEIVED: "Recibida",
-  REVIEWING: "En revisión",
-  QUOTED: "Cotizada",
-  APPROVED: "Aprobada",
-  PROCESSING: "En proceso",
-  DELIVERED: "Entregada",
-};
+const statuses = ["RECEIVED", "REVIEWING", "SOURCING", "QUOTED", "AWAITING_DECISION", "ACCEPTED", "COMPLETED"];
+const statusLabels: Record<string, string> = { RECEIVED: "Recibida", REVIEWING: "En revisión", SOURCING: "En gestión", QUOTED: "Cotizada", AWAITING_DECISION: "Esperando decisión", ACCEPTED: "Aceptada", REJECTED: "Rechazada", CANCELLED: "Cancelada", COMPLETED: "Finalizada" };
+const statusTones: Record<string, import("../../components/StatusBadge").StatusTone> = { RECEIVED: "info", REVIEWING: "warning", SOURCING: "progress", QUOTED: "accent", AWAITING_DECISION: "accent", ACCEPTED: "success", REJECTED: "danger", CANCELLED: "neutral", COMPLETED: "neutral" };
+
+function SkeletonDetail() { return <div className="mx-auto max-w-[1480px] animate-pulse space-y-6"><div className="h-4 w-36 rounded bg-slate-200" /><div className="flex justify-between border-b border-[var(--border)] pb-6"><div className="space-y-3"><div className="h-3 w-24 rounded bg-slate-200" /><div className="h-9 w-72 rounded bg-slate-200" /><div className="h-3 w-56 rounded bg-slate-200" /></div><div className="h-11 w-48 rounded-xl bg-slate-200" /></div><div className="grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]"><div className="space-y-5"><div className="h-28 rounded-2xl bg-white" /><div className="h-56 rounded-2xl bg-white" /><div className="h-32 rounded-2xl bg-white" /></div><div className="h-72 rounded-2xl bg-white" /></div></div>; }
+
+function Panel({ children, className = "" }: { children: React.ReactNode; className?: string }) { return <section className={`rounded-2xl border border-[var(--border)] bg-white p-5 shadow-[0_10px_28px_rgba(7,30,65,0.04)] ${className}`}>{children}</section>; }
+function SectionHeading({ icon, title, detail }: { icon: React.ReactNode; title: string; detail?: string }) { return <div className="mb-5 flex items-center gap-3"><div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--blue)]/10 text-[var(--blue)]">{icon}</div><div><h2 className="font-display text-base font-extrabold text-[var(--navy)]">{title}</h2>{detail && <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{detail}</p>}</div></div>; }
+function Info({ label, value }: { label: string; value: string }) { return <div><dt className="text-[10px] font-bold uppercase tracking-[0.14em] text-[var(--text-secondary)]">{label}</dt><dd className="mt-1 break-words text-sm font-semibold text-[var(--navy)]">{value}</dd></div>; }
+function SummaryCard({ icon, tone, label, value, detail }: { icon: React.ReactNode; tone: "violet" | "green" | "blue" | "cyan"; label: string; value: string; detail: string }) { const tones = { violet: "bg-violet-50 text-[var(--purple)]", green: "bg-emerald-50 text-emerald-600", blue: "bg-blue-50 text-[var(--blue)]", cyan: "bg-cyan-50 text-[var(--cyan)]" }; return <div className="flex min-w-0 items-center gap-3 rounded-xl border border-[var(--border)] bg-white p-3 shadow-[0_6px_18px_rgba(7,30,65,0.03)]"><div className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full ${tones[tone]}`}>{icon}</div><div className="min-w-0"><p className="text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">{label}</p><p className="mt-0.5 truncate text-lg font-extrabold leading-tight text-[var(--navy)]">{value}</p><p className="text-[10px] text-[var(--text-secondary)]">{detail}</p></div></div>; }
 
 export default function SolicitudDetailPage() {
   const params = useParams<{ id: string }>();
   const [request, setRequest] = useState<RequestDetail | null>(null);
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
+  const [showNote, setShowNote] = useState(false);
+  const [note, setNote] = useState("");
+  const [isSavingNote, setIsSavingNote] = useState(false);
+  const [noteError, setNoteError] = useState("");
+  const [showQuoteForm, setShowQuoteForm] = useState(false);
+  const [editingQuote, setEditingQuote] = useState<QuoteDetail | null>(null);
+  const [selectedQuote, setSelectedQuote] = useState<QuoteDetail | null>(null);
 
-  useEffect(() => {
-    const fetchRequest = async () => {
-      try {
-        setIsLoading(true);
-        setError("");
+  const saveNote = async () => {
+    const message = note.trim();
+    if (!message || isSavingNote) return;
+    try {
+      setIsSavingNote(true);
+      setNoteError("");
+      const response = await fetch(`/api/quote-requests/${params.id}`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ message }) });
+      const createdNote = (await response.json()) as RequestNote | { error?: string };
+      if (!response.ok || !("id" in createdNote)) throw new Error("error" in createdNote && createdNote.error ? createdNote.error : "No fue posible guardar la nota");
+      setRequest((current) => current ? { ...current, internalNotes: [createdNote, ...current.internalNotes] } : current);
+      setNote("");
+      setShowNote(false);
+    } catch (saveError) {
+      setNoteError(saveError instanceof Error ? saveError.message : "No fue posible guardar la nota");
+    } finally {
+      setIsSavingNote(false);
+    }
+  };
 
-        const response = await fetch(`/api/quote-requests/${params.id}`);
+  useEffect(() => { const fetchRequest = async () => { try { setIsLoading(true); setError(""); const response = await fetch(`/api/quote-requests/${params.id}`); if (!response.ok) throw new Error(response.status === 404 ? "La solicitud no existe o fue eliminada" : "Error al cargar la solicitud"); setRequest((await response.json()) as RequestDetail); } catch (fetchError) { setError(fetchError instanceof Error ? fetchError.message : "Error desconocido"); } finally { setIsLoading(false); } }; fetchRequest(); }, [params.id]);
 
-        if (!response.ok) {
-          throw new Error(response.status === 404 ? "La solicitud no existe o fue eliminada" : "Error al cargar la solicitud");
-        }
+  const progressIndex = useMemo(() => request ? Math.max(statuses.indexOf(request.status), 0) : 0, [request]);
+  if (isLoading) return <SkeletonDetail />;
+  if (error || !request) return <div className="mx-auto max-w-[1480px]"><ErrorState title="No fue posible abrir la solicitud" description={error || "Solicitud no encontrada"} /></div>;
+  const customerName = request.customer?.name || request.requesterName || "Cliente sin nombre";
+  const customerEmail = request.customer?.email || request.requesterEmail || "Sin correo registrado";
+  const customerPhone = request.customer?.phone || request.requesterPhone || "No informado";
+  const customerRut = request.customer?.rut || request.requesterRut || "No informado";
+  const customerCity = request.customer?.city || request.requesterCity || "No informada";
 
-        setRequest((await response.json()) as RequestDetail);
-      } catch (fetchError) {
-        setError(fetchError instanceof Error ? fetchError.message : "Error desconocido");
-      } finally {
-        setIsLoading(false);
-      }
-    };
+  return <div className="mx-auto w-full max-w-[1480px] px-1 py-2 sm:px-2 lg:px-4"><Link href="/app/solicitudes" className="inline-flex items-center gap-2 text-xs font-bold text-[var(--blue)] transition hover:text-[var(--navy)]"><ArrowLeft className="h-4 w-4" />Volver a solicitudes</Link>
+    <motion.header initial={{ opacity: 0, y: -8 }} animate={{ opacity: 1, y: 0 }} className="mt-5 flex flex-col gap-5 border-b border-[var(--border)] pb-6 xl:flex-row xl:items-start xl:justify-between"><div className="flex items-start gap-3"><div className="mt-1 flex h-10 w-10 items-center justify-center rounded-full border-2 border-[var(--purple)] text-[var(--purple)]"><ClipboardList className="h-5 w-5" /></div><div><p className="text-xs font-bold uppercase tracking-[0.18em] text-[var(--purple)]">Solicitud</p><div className="mt-1 flex flex-wrap items-center gap-3"><h1 className="font-display text-2xl font-extrabold tracking-tight text-[var(--navy)] sm:text-3xl">{request.requestNumber || "Sin número"}</h1><StatusBadge label={statusLabels[request.status] || request.status} tone={statusTones[request.status]} /></div><p className="mt-2 flex items-center gap-2 text-xs text-[var(--text-secondary)]"><CalendarDays className="h-3.5 w-3.5" />Recibida el {new Date(request.createdAt).toLocaleDateString("es-CL", { dateStyle: "long" })} a las {new Date(request.createdAt).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}</p></div></div><div className="flex flex-wrap gap-2"><SecondaryButton disabled title="Gestión de estado próximamente" icon={Clock3}>Gestionar estado</SecondaryButton><PrimaryButton onClick={() => setShowQuoteForm(true)} icon={ReceiptText}>Crear cotización</PrimaryButton></div></motion.header>
 
-    fetchRequest();
-  }, [params.id]);
+    <CreateQuoteModal
+      open={showQuoteForm}
+      onClose={() => { setShowQuoteForm(false); setEditingQuote(null); }}
+      requestId={request.id}
+      customerName={customerName}
+      medications={request.medications}
+      editingQuote={editingQuote}
+      onCreated={(quote) => {
+        const isFinal = quote.status !== "DRAFT";
+        setRequest((current) => {
+          if (!current) return current;
+          const exists = current.quotes.some((existing) => existing.id === quote.id);
+          const quotes = exists ? current.quotes.map((existing) => (existing.id === quote.id ? quote : existing)) : [quote, ...current.quotes];
+          return { ...current, status: isFinal ? "QUOTED" : current.status, price: isFinal ? Number(quote.total ?? 0) : current.price, quotes };
+        });
+        setShowQuoteForm(false);
+        setEditingQuote(null);
+      }}
+    />
+    <ViewQuoteModal
+      open={Boolean(selectedQuote)}
+      onClose={() => setSelectedQuote(null)}
+      quote={selectedQuote}
+      customerName={customerName}
+      onEdit={(quote) => {
+        setSelectedQuote(null);
+        setEditingQuote(quote);
+        setShowQuoteForm(true);
+      }}
+      onSent={(quote) => {
+        setRequest((current) => (current ? { ...current, quotes: current.quotes.map((existing) => (existing.id === quote.id ? quote : existing)) } : current));
+        setSelectedQuote(quote);
+      }}
+    />
 
-  if (isLoading) {
-    return <div className="w-full px-4 py-6 text-sm text-[var(--text-secondary)] sm:px-6 lg:px-8">Cargando solicitud...</div>;
-  }
+    <section className="mt-5 border-y border-[var(--border)] py-4"><div className="mb-3 flex items-center justify-between"><p className="text-[10px] font-bold uppercase tracking-[0.16em] text-[var(--text-secondary)]">Progreso de la solicitud</p><span className="text-[10px] font-semibold text-[var(--purple)]">{statusLabels[request.status] || request.status}</span></div><div className="overflow-x-auto pb-1"><div className="flex min-w-[620px] items-start">{statuses.map((status, index) => { const complete = index < progressIndex; const current = index === progressIndex && request.status !== "REJECTED" && request.status !== "CANCELLED"; return <div key={status} className="relative flex flex-1 flex-col items-center text-center"><div className="flex w-full items-center"><div className={`h-0.5 flex-1 ${index === 0 ? "bg-transparent" : index <= progressIndex ? "bg-[var(--blue)]" : "bg-[var(--border)]"}`} /><div className={`z-10 flex h-7 w-7 shrink-0 items-center justify-center rounded-full border-2 text-[10px] font-bold ${current ? "border-[var(--purple)] bg-[var(--purple)] text-white shadow-[0_0_0_4px_rgba(122,40,216,0.1)]" : complete ? "border-[var(--blue)] bg-[var(--blue)] text-white" : "border-[var(--border)] bg-white text-[var(--text-secondary)]"}`}>{complete ? <Check className="h-3.5 w-3.5" /> : index + 1}</div><div className={`h-0.5 flex-1 ${index === statuses.length - 1 ? "bg-transparent" : index < progressIndex ? "bg-[var(--blue)]" : "bg-[var(--border)]"}`} /></div><p className={`mt-2 px-1 text-[10px] font-bold ${current ? "text-[var(--purple)]" : complete ? "text-[var(--blue)]" : "text-[var(--text-secondary)]"}`}>{statusLabels[status]}</p></div>; })}</div></div></section>
 
-  if (error || !request) {
-    return (
-      <div className="w-full px-4 py-6 sm:px-6 lg:px-8">
-        <ErrorState title="No fue posible abrir la solicitud" description={error || "Solicitud no encontrada"} />
-      </div>
-    );
-  }
+    <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.35fr)_minmax(19rem,0.65fr)]"><main className="space-y-5"><div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"><SummaryCard icon={<ClipboardList className="h-4 w-4" />} tone="violet" label="Medicamentos" value={String(request.medications.length)} detail="solicitados" /><SummaryCard icon={<FileText className="h-4 w-4" />} tone="green" label="Receta" value={request.prescription ? "Sí" : "No"} detail="archivo registrado" /><SummaryCard icon={<UserRound className="h-4 w-4" />} tone="blue" label="Paciente" value={request.patientName || "No informado"} detail="datos disponibles" /><SummaryCard icon={<ReceiptText className="h-4 w-4" />} tone="cyan" label="Precio" value={request.price ? `$${Number(request.price).toLocaleString("es-CL")}` : "-"} detail="cotización" /></div>
 
-  return (
-    <div className="w-full px-4 py-6 sm:px-6 lg:px-8">
-      <Link href="/app/solicitudes" className="inline-flex items-center gap-2 text-sm font-semibold text-[var(--blue)] transition-colors hover:text-[var(--navy)]">
-        <ArrowLeft className="h-4 w-4" />
-        Volver a solicitudes
-      </Link>
-
-      <header className="mt-5 flex flex-col gap-5 border-b border-[var(--border)] pb-6 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--blue)]">Solicitud</p>
-          <div className="mt-2 flex flex-wrap items-center gap-3">
-            <h1 className="text-2xl font-bold font-display text-[var(--navy)] sm:text-3xl">{request.requestNumber ?? "Sin número"}</h1>
-            <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-semibold text-blue-700">
-              {statusLabels[request.status] || request.status}
-            </span>
-          </div>
-          <p className="mt-2 text-sm text-[var(--text-secondary)]">
-            Recibida el {new Date(request.createdAt).toLocaleDateString("es-CL", { dateStyle: "long" })}
-          </p>
-        </div>
-
-        <div className="flex flex-wrap gap-3">
-          <button type="button" disabled title="Próximamente" className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl border border-[var(--border)] px-4 py-2.5 text-sm font-semibold text-[var(--text-secondary)] opacity-60">
-            Gestionar estado
-          </button>
-          <button type="button" disabled title="Próximamente" className="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-[var(--navy)] px-4 py-2.5 text-sm font-semibold text-white opacity-60">
-            <ReceiptText className="h-4 w-4" />
-            Crear cotización
-          </button>
-        </div>
-      </header>
-
-      <div className="grid gap-8 py-7 lg:grid-cols-[minmax(0,1.3fr)_minmax(18rem,0.7fr)]">
-        <section className="space-y-8">
-          <DetailSection icon={<ClipboardList className="h-5 w-5" />} title="Medicamentos solicitados">
-            <div className="overflow-x-auto border-y border-[var(--border)]">
-              <table className="w-full min-w-[38rem] text-left text-sm">
-                <thead className="bg-[var(--background)] text-[11px] font-semibold uppercase tracking-[0.16em] text-[var(--text-secondary)]">
-                  <tr><th className="px-4 py-3">Medicamento</th><th className="px-4 py-3">Principio activo</th><th className="px-4 py-3">Concentración</th><th className="px-4 py-3 text-right">Cantidad</th></tr>
-                </thead>
-                <tbody>
-                  {request.medications.map((medication) => (
-                    <tr key={medication.id} className="border-t border-[var(--border)] text-[var(--text-secondary)]">
-                      <td className="px-4 py-4 font-semibold text-[var(--navy)]">{medication.commercialName}</td>
-                      <td className="px-4 py-4">{medication.activeIngredient}</td>
-                      <td className="px-4 py-4">{medication.concentration}</td>
-                      <td className="px-4 py-4 text-right">{medication.tabletQuantity}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </DetailSection>
-
-          <DetailSection icon={<FileText className="h-5 w-5" />} title="Receta médica">
-            {request.prescription ? (
-              <div className="flex items-center justify-between gap-4 border-y border-[var(--border)] py-4 text-sm">
-                <div className="min-w-0"><p className="truncate font-semibold text-[var(--navy)]">{request.prescription.fileName}</p><p className="mt-1 text-[var(--text-secondary)]">{request.prescription.mimeType} · {(request.prescription.fileSize / 1024).toFixed(1)} KB</p></div>
-                <span className="shrink-0 text-xs font-semibold text-[var(--text-secondary)]">Archivo registrado</span>
-              </div>
-            ) : <p className="text-sm text-[var(--text-secondary)]">No se adjuntó una receta.</p>}
-          </DetailSection>
-        </section>
-
-        <aside className="space-y-8 border-t border-[var(--border)] pt-7 lg:border-t-0 lg:border-l lg:pt-0 lg:pl-8">
-          <DetailSection icon={<UserRound className="h-5 w-5" />} title="Cliente">
-            <dl className="space-y-4 text-sm"><Info label="Nombre" value={request.customer.name} /><Info label="Correo" value={request.customer.email} /><Info label="Teléfono" value={request.customer.phone} /><Info label="RUT" value={request.customer.rut} /><Info label="Ciudad" value={request.customer.city} /></dl>
-          </DetailSection>
-          <DetailSection icon={<UserRound className="h-5 w-5" />} title="Paciente">
-            <dl className="space-y-4 text-sm"><Info label="Nombre" value={request.patientName || "No informado"} /><Info label="RUT" value={request.patientRut || "No informado"} /></dl>
-          </DetailSection>
-        </aside>
-      </div>
-    </div>
-  );
-}
-
-function DetailSection({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
-  return <section><h2 className="mb-4 flex items-center gap-2 text-base font-bold text-[var(--navy)]">{icon}{title}</h2>{children}</section>;
-}
-
-function Info({ label, value }: { label: string; value: string }) {
-  return <div><dt className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--text-secondary)]">{label}</dt><dd className="mt-1 break-words font-medium text-[var(--navy)]">{value}</dd></div>;
+      <Panel><SectionHeading icon={<ClipboardList className="h-4 w-4" />} title="Medicamentos solicitados" detail={`${request.medications.length} medicamento${request.medications.length === 1 ? "" : "s"} en esta solicitud`} /><div className="overflow-x-auto"><table className="w-full min-w-[540px] text-left"><thead><tr className="border-b border-[var(--border)] bg-[var(--background)]"><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Medicamento</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Principio activo</th><th className="px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Concentración</th><th className="px-4 py-3 text-right text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">Cantidad</th></tr></thead><tbody>{request.medications.map((medication) => <tr key={medication.id} className="border-b border-[var(--border)] last:border-0"><td className="px-4 py-4 text-sm font-bold text-[var(--navy)]">{medication.commercialName}</td><td className="px-4 py-4 text-xs text-[var(--text-secondary)]">{medication.activeIngredient}</td><td className="px-4 py-4 text-xs text-[var(--text-secondary)]">{medication.concentration}</td><td className="px-4 py-4 text-right text-sm font-bold text-[var(--navy)]">{medication.tabletQuantity}</td></tr>)}</tbody></table></div></Panel>
+      {request.quotes.length > 0 && <Panel><SectionHeading icon={<ReceiptText className="h-4 w-4" />} title="Cotizaciones" detail={`${request.quotes.length} cotización${request.quotes.length === 1 ? "" : "es"} generada${request.quotes.length === 1 ? "" : "s"}`} /><div className="space-y-3">{request.quotes.map((quote) => <button key={quote.id} type="button" onClick={() => setSelectedQuote(quote)} className="flex w-full flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border)] bg-[var(--background)] p-4 text-left transition hover:border-[var(--blue)] hover:bg-white"><div className="min-w-0"><p className="text-sm font-extrabold text-[var(--navy)]">{quote.quoteNumber || `Borrador v${quote.version}`}</p><p className="mt-1 text-xs text-[var(--text-secondary)]">{quote.items.length} producto{quote.items.length === 1 ? "" : "s"} · Emitida el {new Date(quote.createdAt).toLocaleDateString("es-CL")}</p></div><div className="flex items-center gap-3"><StatusBadge label={quoteStatusLabels[quote.status] || quote.status} tone={quoteStatusTones[quote.status]} /><p className="text-sm font-extrabold text-[var(--navy)]">{quote.total ? `$${Number(quote.total).toLocaleString("es-CL")}` : "Pendiente"}</p></div></button>)}</div></Panel>}
+      <Panel><SectionHeading icon={<FileText className="h-4 w-4" />} title="Receta médica" detail="Documento adjunto a la solicitud" />{request.prescription ? <div className="flex flex-col gap-4 rounded-xl border border-[var(--border)] bg-[var(--background)] p-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex min-w-0 items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-white text-[var(--purple)]"><FileText className="h-5 w-5" /></div><div className="min-w-0"><p className="truncate text-sm font-bold text-[var(--navy)]">{request.prescription.fileName}</p><p className="mt-1 text-xs text-[var(--text-secondary)]">{request.prescription.mimeType} · {(request.prescription.fileSize / 1024).toFixed(1)} KB</p></div></div><button type="button" disabled title="Visor próximamente" className="cursor-not-allowed rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-xs font-bold text-[var(--text-secondary)] opacity-60">Ver receta</button></div> : <p className="rounded-xl bg-[var(--background)] p-4 text-sm text-[var(--text-secondary)]">No se adjuntó una receta médica.</p>}</Panel>
+      <Panel><div className="flex items-center justify-between"><SectionHeading icon={<MessageSquare className="h-4 w-4" />} title="Notas internas" detail="Visibles sólo para el equipo AXESSIA" /><button type="button" onClick={() => { setShowNote(!showNote); setNoteError(""); }} className="rounded-lg border border-[var(--purple)] px-3 py-2 text-xs font-bold text-[var(--purple)] transition hover:bg-violet-50">{showNote ? "Cancelar" : "Agregar nota"}</button></div>{showNote && <div className="mb-4 space-y-2"><textarea value={note} onChange={(event) => setNote(event.target.value)} placeholder="Escribe una nota interna..." rows={3} className="w-full rounded-xl border border-[var(--border)] bg-[var(--background)] p-3 text-sm outline-none focus:border-[var(--blue)]" /><button type="button" onClick={saveNote} disabled={!note.trim() || isSavingNote} className="rounded-lg bg-[var(--navy)] px-3 py-2 text-xs font-bold text-white disabled:cursor-not-allowed disabled:opacity-40">{isSavingNote ? "Guardando..." : "Guardar nota"}</button>{noteError && <p className="text-xs font-semibold text-rose-600">{noteError}</p>}</div>}{request.internalNotes.length ? <div className="space-y-3">{request.internalNotes.map((internalNote) => <article key={internalNote.id} className="rounded-xl border border-[var(--border)] bg-[var(--background)] p-4"><div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-bold text-[var(--navy)]">{internalNote.executiveName}</p><time className="text-[10px] text-[var(--text-secondary)]" dateTime={internalNote.createdAt}>{new Date(internalNote.createdAt).toLocaleDateString("es-CL")}</time></div><p className="mt-2 whitespace-pre-wrap text-sm text-[var(--text-secondary)]">{internalNote.message}</p></article>)}</div> : <div className="rounded-xl border border-dashed border-[var(--border)] p-4 text-sm text-[var(--text-secondary)]">Aún no hay notas internas registradas.</div>}</Panel>
+    </main><aside className="space-y-6"><Panel><SectionHeading icon={<UserRound className="h-4 w-4" />} title="Cliente" /><div className="mb-5 flex items-center gap-3"><Avatar name={customerName} /><div className="min-w-0"><p className="truncate text-sm font-bold text-[var(--navy)]">{customerName}</p><p className="truncate text-xs text-[var(--text-secondary)]">Contacto solicitante</p></div></div><dl className="space-y-4"><Info label="Correo" value={customerEmail} /><Info label="Teléfono" value={customerPhone} /><Info label="RUT" value={customerRut} /><Info label="Ciudad" value={customerCity} /></dl></Panel><Panel><SectionHeading icon={<UserRound className="h-4 w-4" />} title="Paciente" /><dl className="space-y-4"><Info label="Nombre" value={request.patientName || "No informado"} /><Info label="RUT" value={request.patientRut || "No informado"} /></dl></Panel><Panel><SectionHeading icon={<History className="h-4 w-4" />} title="Historial" /><div className="space-y-5">{[{ label: "Solicitud creada", date: request.createdAt, color: "bg-[var(--blue)]" }, { label: `Estado: ${statusLabels[request.status] || request.status}`, date: request.updatedAt || request.createdAt, color: "bg-[var(--purple)]" }].map((event) => <div key={event.label} className="relative flex gap-3"><span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${event.color}`} /><div><p className="text-xs font-bold text-[var(--navy)]">{event.label}</p><p className="mt-1 text-[10px] text-[var(--text-secondary)]">{new Date(event.date).toLocaleDateString("es-CL")} · {new Date(event.date).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}</p></div></div>)}</div></Panel></aside></div>
+  </div>;
 }

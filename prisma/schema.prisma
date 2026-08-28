@@ -10,10 +10,28 @@ datasource db {
 enum QuoteRequestStatus {
   RECEIVED
   REVIEWING
+  SOURCING
   QUOTED
-  APPROVED
-  PROCESSING
-  DELIVERED
+  AWAITING_DECISION
+  ACCEPTED
+  REJECTED
+  CANCELLED
+  COMPLETED
+}
+
+enum QuoteStatus {
+  DRAFT
+  READY
+  SENT
+  ACCEPTED
+  REJECTED
+  EXPIRED
+  VOIDED
+}
+
+enum QuoteItemCondition {
+  AVAILABLE
+  SPECIAL_IMPORT
 }
 
 enum UserRole {
@@ -22,72 +40,184 @@ enum UserRole {
 }
 
 model User {
-  id        String    @id @default(cuid())
-  firstName String
-  lastName  String
-  email     String    @unique
-  rut       String    @unique
-  role      UserRole  @default(EJECUTIVO)
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  id                 String              @id @default(cuid())
+  firstName          String
+  lastName           String
+  email              String              @unique
+  rut                String              @unique
+  role               UserRole            @default(EJECUTIVO)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  quoteRequestEvents QuoteRequestEvent[]
+  assignedRequests   QuoteRequest[]      @relation("AssignedExecutiveRequests")
 }
 
 model Customer {
-  id                 String         @id @default(cuid())
-  name               String
-  phone              String
-  email              String         @unique
-  rut                String         @unique
-  city               String
-  passwordHash       String?
-  hasPendingRequest  Boolean        @default(false)
-  promotionsConsent  Boolean        @default(false)
-  createdAt          DateTime       @default(now())
-  updatedAt          DateTime       @updatedAt
-  requests           QuoteRequest[]
+  id                String         @id @default(cuid())
+  name              String
+  phone             String
+  email             String         @unique
+  rut               String         @unique
+  city              String
+  passwordHash      String?
+  hasPendingRequest Boolean        @default(false)
+  promotionsConsent Boolean        @default(false)
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  requests          QuoteRequest[]
+  prescriptions     Prescription[]
+  quotes            Quote[]
 }
 
 model QuoteRequest {
-  sequence             Int               @id @default(autoincrement())
-  id                   String            @unique @default(cuid())
-  requestNumber        String?           @unique
-  customerId           String
+  sequence             Int                   @id @default(autoincrement())
+  id                   String                @unique @default(cuid())
+  requestNumber        String?               @unique
+  customerId           String?
+  requesterName        String
+  requesterPhone       String
+  requesterEmail       String
+  requesterRut         String
+  requesterCity        String
   patientName          String?
   patientRut           String?
-  status               QuoteRequestStatus @default(RECEIVED)
-  price                Decimal?          @db.Decimal(12, 2)
+  status               QuoteRequestStatus    @default(RECEIVED)
+  assignedExecutiveId  String?
   acceptsPolicies      Boolean
   acceptsDataTreatment Boolean
-  createdAt            DateTime          @default(now())
-  updatedAt            DateTime          @updatedAt
-  customer             Customer          @relation(fields: [customerId], references: [id], onDelete: Restrict)
-  prescription         Prescription?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  customer             Customer?             @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  assignedExecutive    User?                 @relation("AssignedExecutiveRequests", fields: [assignedExecutiveId], references: [id], onDelete: SetNull)
+  prescriptions        Prescription[]
   medications          Medication[]
+  quotes               Quote[]
+  comments             QuoteRequestComment[]
+  internalNotes        QuoteRequestNote[]
+  events               QuoteRequestEvent[]
 
+  @@index([customerId])
+  @@index([status])
+  @@index([requesterEmail])
+  @@index([requesterRut])
+  @@index([assignedExecutiveId])
+}
+
+model Prescription {
+  id         String       @id @default(cuid())
+  requestId  String
+  customerId String?
+  fileName   String
+  mimeType   String
+  fileSize   Int
+  storageKey String?
+  createdAt  DateTime     @default(now())
+  request    QuoteRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  customer   Customer?    @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  @@index([requestId])
+  @@index([customerId])
+}
+
+model Medication {
+  id               String       @id @default(cuid())
+  requestId        String
+  commercialName   String
+  activeIngredient String
+  concentration    String
+  tabletQuantity   Int
+  createdAt        DateTime     @default(now())
+  request          QuoteRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId])
+}
+
+model Quote {
+  sequence             Int                   @id @default(autoincrement())
+  id                   String                @unique @default(cuid())
+  customerId           String
+  requestId            String
+  quoteNumber          String?               @unique
+  version              Int                   @default(1)
+  status               QuoteStatus           @default(DRAFT)
+  total                Decimal?              @db.Decimal(12, 2)
+  validUntil           DateTime?
+  sentAt               DateTime?
+  acceptedAt           DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  customer             Customer              @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  request              QuoteRequest          @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  items                QuoteItem[]
+  quoteRequestComments QuoteRequestComment[]
+
+  @@unique([requestId, version])
+  @@index([requestId])
   @@index([customerId])
   @@index([status])
 }
 
-model Prescription {
-  id           String       @id @default(cuid())
-  requestId    String       @unique
-  fileName     String
-  mimeType     String
-  fileSize     Int
-  storageKey   String?
-  createdAt    DateTime     @default(now())
-  request      QuoteRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+model QuoteItem {
+  id                 String              @id @default(cuid())
+  quoteId            String
+  productName        String
+  activeIngredient   String?
+  concentration      String?
+  pharmaceuticalForm String?
+  presentation       String?
+  unitsPerPackage    Int?
+  manufacturer       String?
+  originCountry      String?
+  supplierCountry    String?
+  quantity           Int
+  sanitaryRegistry   String?
+  condition          QuoteItemCondition?
+  batchNumber        String?
+  expirationDate     DateTime?
+  unitPrice          Decimal?            @db.Decimal(12, 2)
+  totalPrice         Decimal?            @db.Decimal(12, 2)
+  createdAt          DateTime            @default(now())
+  quote              Quote               @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+
+  @@index([quoteId])
 }
 
-model Medication {
-  id                 String       @id @default(cuid())
-  requestId          String
-  commercialName     String
-  activeIngredient   String
-  concentration     String
-  tabletQuantity     Int
-  createdAt          DateTime     @default(now())
-  request            QuoteRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+model QuoteRequestComment {
+  id         String       @id @default(cuid())
+  requestId  String
+  quoteId    String?
+  authorType String
+  message    String       @db.Text
+  createdAt  DateTime     @default(now())
+  request    QuoteRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  quote      Quote?       @relation(fields: [quoteId], references: [id], onDelete: SetNull)
 
-  @@index([requestId])
+  @@index([requestId, createdAt])
+  @@index([quoteId])
+}
+
+model QuoteRequestNote {
+  id            String       @id @default(cuid())
+  requestId     String
+  executiveName String
+  message       String       @db.Text
+  createdAt     DateTime     @default(now())
+  request       QuoteRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
+}
+
+model QuoteRequestEvent {
+  id        String             @id @default(cuid())
+  requestId String
+  status    QuoteRequestStatus
+  eventType String
+  note      String?            @db.Text
+  actorId   String?
+  createdAt DateTime           @default(now())
+  request   QuoteRequest       @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  actor     User?              @relation(fields: [actorId], references: [id], onDelete: SetNull)
+
+  @@index([requestId, createdAt])
+  @@index([actorId])
 }

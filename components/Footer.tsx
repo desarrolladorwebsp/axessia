@@ -70,7 +70,8 @@ export default function Footer() {
         <motion.div className="footer-contact" initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} variants={reveal}>
           <h2>Contacto</h2>
           <ContactLine icon={Mail} text="Correo disponible próximamente" />
-          <ContactLine icon={Phone} text="Teléfono disponible próximamente" />
+          <ContactLine icon={Phone} text="+56 9 6732 9309" href="tel:+56967329309" />
+          <ContactLine icon={Phone} text="+56 9 7992 8080" href="tel:+56979928080" />
           <ContactLine icon={MapPin} text="Ubicación disponible próximamente" />
           <ContactLine icon={Clock3} text="Horario disponible próximamente" />
         </motion.div>
@@ -145,6 +146,6 @@ function FooterColumn({ title, items }: { title: string; items: string[][] }) {
   );
 }
 
-function ContactLine({ icon: Icon, text }: { icon: typeof Mail; text: string }) {
-  return <p className="footer-contact-line"><Icon size={17} aria-hidden="true" /><span>{text}</span></p>;
+function ContactLine({ icon: Icon, text, href }: { icon: typeof Mail; text: string; href?: string }) {
+  return <p className="footer-contact-line"><Icon size={17} aria-hidden="true" />{href ? <a href={href}>{text}</a> : <span>{text}</span>}</p>;
 }

@@ -1,0 +1,232 @@
+[
+  {
+    "id": "dev-quote-1787931313019",
+    "sequence": 5,
+    "quoteNumber": "C-10005",
+    "customerId": "dev-customer-dev-1787930286269",
+    "requestId": "dev-1787930286269",
+    "customer": {
+      "id": "dev-customer-dev-1787930286269",
+      "name": "ALFREDO",
+      "phone": "+56838316917",
+      "email": "soyalfredo.dev@gmail.com",
+      "rut": "256840456",
+      "city": "SANTIAGO"
+    },
+    "request": {
+      "id": "dev-1787930286269",
+      "requestNumber": "S-100008",
+      "requesterName": "ALFREDO",
+      "requesterEmail": "soyalfredo.dev@gmail.com"
+    },
+    "version": 1,
+    "status": "SENT",
+    "total": 90000,
+    "validUntil": "2026-09-04T00:00:00.000Z",
+    "createdAt": "2026-08-28T15:35:13.019Z",
+    "sentAt": "2026-08-28T15:35:13.453Z",
+    "items": [
+      {
+        "productName": "Medicamento 1",
+        "activeIngredient": "principio 1",
+        "concentration": "500 mg",
+        "pharmaceuticalForm": null,
+        "presentation": null,
+        "unitsPerPackage": null,
+        "manufacturer": null,
+        "originCountry": null,
+        "supplierCountry": null,
+        "quantity": 1,
+        "sanitaryRegistry": null,
+        "condition": null,
+        "batchNumber": null,
+        "expirationDate": null,
+        "unitPrice": 90000,
+        "totalPrice": 90000,
+        "id": "dev-quote-item-1787931313019-0"
+      }
+    ]
+  },
+  {
+    "id": "dev-quote-1787927389774",
+    "sequence": 4,
+    "quoteNumber": "C-10004",
+    "customerId": "dev-customer-dev-1787926925893",
+    "requestId": "dev-1787926925893",
+    "customer": {
+      "id": "dev-customer-dev-1787926925893",
+      "name": "Alfredo Alejandro Hurtado",
+      "phone": "+353838316917",
+      "email": "alfredocl2016@gmail.com",
+      "rut": "256849456",
+      "city": "Cork, Irlanda"
+    },
+    "request": {
+      "id": "dev-1787926925893",
+      "requestNumber": "S-100007",
+      "requesterName": "Alfredo Alejandro Hurtado",
+      "requesterEmail": "alfredocl2016@gmail.com"
+    },
+    "version": 1,
+    "status": "SENT",
+    "total": 90000,
+    "validUntil": "2026-09-04T00:00:00.000Z",
+    "createdAt": "2026-08-28T14:29:49.774Z",
+    "sentAt": "2026-08-28T14:29:50.878Z",
+    "items": [
+      {
+        "productName": "medi 1",
+        "activeIngredient": "or 1",
+        "concentration": "55",
+        "pharmaceuticalForm": null,
+        "presentation": null,
+        "unitsPerPackage": null,
+        "manufacturer": null,
+        "originCountry": null,
+        "supplierCountry": null,
+        "quantity": 1,
+        "sanitaryRegistry": null,
+        "condition": null,
+        "batchNumber": null,
+        "expirationDate": null,
+        "unitPrice": 90000,
+        "totalPrice": 90000,
+        "id": "dev-quote-item-1787927389774-0"
+      }
+    ]
+  },
+  {
+    "id": "dev-quote-1787844081205",
+    "sequence": 3,
+    "quoteNumber": "C-10003",
+    "customerId": "dev-customer-dev-1787753884969",
+    "requestId": "dev-1787753884969",
+    "customer": {
+      "id": "dev-customer-dev-1787753884969",
+      "name": "Maria Perez",
+      "phone": "+56921629730",
+      "email": "alfredocl2016@gmail.com",
+      "rut": "25684045-6",
+      "city": "SANTIAGO"
+    },
+    "request": {
+      "id": "dev-1787753884969",
+      "requestNumber": "S-100006",
+      "requesterName": "Maria Perez",
+      "requesterEmail": "alfredocl2016@gmail.com"
+    },
+    "version": 3,
+    "status": "SENT",
+    "total": 1050000,
+    "validUntil": "2026-09-03T00:00:00.000Z",
+    "createdAt": "2026-08-27T15:21:21.205Z",
+    "sentAt": "2026-08-27T15:21:22.505Z",
+    "items": [
+      {
+        "productName": "Nombre",
+        "activeIngredient": "Activo",
+        "concentration": "500",
+        "pharmaceuticalForm": null,
+        "presentation": null,
+        "unitsPerPackage": null,
+        "manufacturer": null,
+        "originCountry": null,
+        "supplierCountry": null,
+        "quantity": 30,
+        "sanitaryRegistry": null,
+        "condition": null,
+        "batchNumber": null,
+        "expirationDate": null,
+        "unitPrice": 35000,
+        "totalPrice": 1050000,
+        "id": "dev-quote-item-1787844081205-0"
+      }
+    ]
+  },
+  {
+    "id": "dev-quote-1787843376319",
+    "sequence": 2,
+    "quoteNumber": "C-10002",
+    "customerId": "dev-customer-dev-1787753884969",
+    "requestId": "dev-1787753884969",
+    "customer": {
+      "id": "dev-customer-dev-1787753884969",
+      "name": "Maria Perez",
+      "phone": "+56921629730",
+      "email": "alfredocl2016@gmail.com",
+      "rut": "25684045-6",
+      "city": "SANTIAGO"
+    },
+    "request": {
+      "id": "dev-1787753884969",
+      "requestNumber": "S-100006",
+      "requesterName": "Maria Perez",
+      "requesterEmail": "alfredocl2016@gmail.com"
+    },
+    "version": 2,
+    "status": "READY",
+    "total": 900000,
+    "validUntil": "2026-09-03T00:00:00.000Z",
+    "createdAt": "2026-08-27T15:09:36.319Z",
+    "sentAt": null,
+    "items": [
+      {
+        "productName": "Nombre",
+        "activeIngredient": "Activo",
+        "concentration": "500",
+        "pharmaceuticalForm": null,
+        "presentation": null,
+        "unitsPerPackage": null,
+        "manufacturer": null,
+        "originCountry": null,
+        "supplierCountry": null,
+        "quantity": 30,
+        "sanitaryRegistry": null,
+        "condition": null,
+        "batchNumber": null,
+        "expirationDate": null,
+        "unitPrice": 30000,
+        "totalPrice": 900000,
+        "id": "dev-quote-item-1787843376319-0"
+      }
+    ]
+  },
+  {
+    "id": "dev-quote-1787842121490",
+    "sequence": 1,
+    "quoteNumber": "C-10001",
+    "customerId": "dev-customer-dev-1787753884969",
+    "requestId": "dev-1787753884969",
+    "customer": {
+      "id": "dev-customer-dev-1787753884969",
+      "name": "Maria Perez",
+      "phone": "+56921629730",
+      "email": "alfredocl2016@gmail.com",
+      "rut": "25684045-6",
+      "city": "SANTIAGO"
+    },
+    "request": {
+      "id": "dev-1787753884969",
+      "requestNumber": "S-100006",
+      "requesterName": "Maria Perez",
+      "requesterEmail": "alfredocl2016@gmail.com"
+    },
+    "version": 1,
+    "status": "DRAFT",
+    "total": 0,
+    "validUntil": "2026-09-24T00:00:00.000Z",
+    "createdAt": "2026-08-27T14:48:41.490Z",
+    "sentAt": null,
+    "items": [
+      {
+        "productName": "Nombre",
+        "activeIngredient": "Activo",
+        "concentration": "500",
+        "quantity": 30,
+        "unitPrice": 0,
+        "totalPrice": 0,
+        "id": "dev-quote-item-1787842121490-0"
+      }
+    ]
+  }
+]

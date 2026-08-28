@@ -1,5 +1,322 @@
 [
   {
+    "id": "dev-1787930286269",
+    "sequence": 8,
+    "requestNumber": "S-100008",
+    "customerId": "dev-customer-dev-1787930286269",
+    "requesterName": "ALFREDO",
+    "requesterPhone": "+56838316917",
+    "requesterEmail": "soyalfredo.dev@gmail.com",
+    "requesterRut": "256840456",
+    "requesterCity": "SANTIAGO",
+    "patientName": null,
+    "patientRut": null,
+    "status": "QUOTED",
+    "price": null,
+    "acceptsPolicies": true,
+    "acceptsDataTreatment": true,
+    "createdAt": "2026-08-28T15:18:06.269Z",
+    "updatedAt": "2026-08-28T15:35:13.019Z",
+    "customer": {
+      "id": "dev-customer-dev-1787930286269",
+      "name": "ALFREDO",
+      "phone": "+56838316917",
+      "email": "soyalfredo.dev@gmail.com",
+      "rut": "256840456",
+      "city": "SANTIAGO"
+    },
+    "prescription": {
+      "id": "dev-prescription-1787930286269",
+      "requestId": "dev-1787930286269",
+      "fileName": "Captura de pantalla 2026-08-27 a la(s) 19.43.27.png",
+      "mimeType": "image/png",
+      "fileSize": 87029,
+      "storageKey": null,
+      "createdAt": "2026-08-28T15:18:06.269Z"
+    },
+    "medications": [
+      {
+        "id": "dev-med-1787930286269-0",
+        "requestId": "dev-1787930286269",
+        "commercialName": "Medicamento 1",
+        "activeIngredient": "principio 1",
+        "concentration": "500 mg",
+        "tabletQuantity": 20,
+        "createdAt": "2026-08-28T15:18:06.269Z"
+      }
+    ],
+    "internalNotes": [
+      {
+        "id": "note-1787930722152",
+        "executiveName": "Administrador",
+        "message": "esto es unaa prueba",
+        "createdAt": "2026-08-28T15:25:22.152Z"
+      }
+    ]
+  },
+  {
+    "id": "dev-1787926925893",
+    "sequence": 7,
+    "requestNumber": "S-100007",
+    "customerId": "dev-customer-dev-1787926925893",
+    "requesterName": "Alfredo Alejandro Hurtado",
+    "requesterPhone": "+353838316917",
+    "requesterEmail": "alfredocl2016@gmail.com",
+    "requesterRut": "256849456",
+    "requesterCity": "Cork, Irlanda",
+    "patientName": null,
+    "patientRut": null,
+    "status": "QUOTED",
+    "price": null,
+    "acceptsPolicies": true,
+    "acceptsDataTreatment": true,
+    "createdAt": "2026-08-28T14:22:05.892Z",
+    "updatedAt": "2026-08-28T14:29:49.774Z",
+    "customer": {
+      "id": "dev-customer-dev-1787926925893",
+      "name": "Alfredo Alejandro Hurtado",
+      "phone": "+353838316917",
+      "email": "alfredocl2016@gmail.com",
+      "rut": "256849456",
+      "city": "Cork, Irlanda"
+    },
+    "prescription": {
+      "id": "dev-prescription-1787926925893",
+      "requestId": "dev-1787926925893",
+      "fileName": "Captura de pantalla 2026-08-27 a la(s) 19.43.27.png",
+      "mimeType": "image/png",
+      "fileSize": 87029,
+      "storageKey": null,
+      "createdAt": "2026-08-28T14:22:05.892Z"
+    },
+    "medications": [
+      {
+        "id": "dev-med-1787926925893-0",
+        "requestId": "dev-1787926925893",
+        "commercialName": "medi 1",
+        "activeIngredient": "or 1",
+        "concentration": "55",
+        "tabletQuantity": 30,
+        "createdAt": "2026-08-28T14:22:05.892Z"
+      }
+    ]
+  },
+  {
+    "id": "dev-1787753884969",
+    "sequence": 6,
+    "requestNumber": "S-100006",
+    "customerId": "dev-customer-dev-1787753884969",
+    "requesterName": "Maria Perez",
+    "requesterPhone": "+56921629730",
+    "requesterEmail": "alfredocl2016@gmail.com",
+    "requesterRut": "25684045-6",
+    "requesterCity": "SANTIAGO",
+    "patientName": null,
+    "patientRut": null,
+    "status": "QUOTED",
+    "price": null,
+    "acceptsPolicies": true,
+    "acceptsDataTreatment": true,
+    "createdAt": "2026-08-26T14:18:04.969Z",
+    "updatedAt": "2026-08-27T15:21:21.205Z",
+    "customer": {
+      "id": "dev-customer-dev-1787753884969",
+      "name": "Maria Perez",
+      "phone": "+56921629730",
+      "email": "alfredocl2016@gmail.com",
+      "rut": "25684045-6",
+      "city": "SANTIAGO"
+    },
+    "prescription": {
+      "id": "dev-prescription-1787753884969",
+      "requestId": "dev-1787753884969",
+      "fileName": "Captura de pantalla 2026-08-26 a la(s) 09.50.53.png",
+      "mimeType": "image/png",
+      "fileSize": 310342,
+      "storageKey": null,
+      "createdAt": "2026-08-26T14:18:04.969Z"
+    },
+    "medications": [
+      {
+        "id": "dev-med-1787753884969-0",
+        "requestId": "dev-1787753884969",
+        "commercialName": "Nombre ",
+        "activeIngredient": "Activo",
+        "concentration": "500",
+        "tabletQuantity": 30,
+        "createdAt": "2026-08-26T14:18:04.969Z"
+      }
+    ],
+    "internalNotes": [
+      {
+        "id": "note-1787835709589",
+        "executiveName": "Administrador",
+        "message": "esto es una prueba",
+        "createdAt": "2026-08-27T13:01:49.589Z"
+      }
+    ]
+  },
+  {
+    "id": "dev-1787753660229",
+    "sequence": 5,
+    "requestNumber": "S-100005",
+    "customerId": null,
+    "requesterName": "Alfredo Email Test",
+    "requesterPhone": "+56987654321",
+    "requesterEmail": "soyalfredo.dev@gmail.com",
+    "requesterRut": "12345678-9",
+    "requesterCity": "Santiago",
+    "patientName": null,
+    "patientRut": null,
+    "status": "RECEIVED",
+    "price": null,
+    "acceptsPolicies": true,
+    "acceptsDataTreatment": true,
+    "createdAt": "2026-08-26T14:14:20.229Z",
+    "updatedAt": "2026-08-26T14:14:20.229Z",
+    "customer": null,
+    "prescription": {
+      "id": "dev-prescription-1787753660229",
+      "requestId": "dev-1787753660229",
+      "fileName": "receta-email-test.pdf",
+      "mimeType": "application/pdf",
+      "fileSize": 1024,
+      "storageKey": null,
+      "createdAt": "2026-08-26T14:14:20.229Z"
+    },
+    "medications": [
+      {
+        "id": "dev-med-1787753660229-0",
+        "requestId": "dev-1787753660229",
+        "commercialName": "Metformina 500mg",
+        "activeIngredient": "Metformina",
+        "concentration": "500mg",
+        "tabletQuantity": 30,
+        "createdAt": "2026-08-26T14:14:20.229Z"
+      }
+    ]
+  },
+  {
+    "id": "dev-1787753064688",
+    "sequence": 4,
+    "requestNumber": "S-100004",
+    "customerId": null,
+    "requesterName": "Alfredo Prueba 2",
+    "requesterPhone": "+56987654322",
+    "requesterEmail": "soyalfredo.dev@gmail.com",
+    "requesterRut": "12345678-2",
+    "requesterCity": "Valparaiso",
+    "patientName": null,
+    "patientRut": null,
+    "status": "REJECTED",
+    "price": null,
+    "acceptsPolicies": true,
+    "acceptsDataTreatment": true,
+    "createdAt": "2026-08-26T14:04:24.688Z",
+    "updatedAt": "2026-08-26T14:14:55.753Z",
+    "customer": null,
+    "prescription": {
+      "id": "dev-prescription-1787753064688",
+      "requestId": "dev-1787753064688",
+      "fileName": "receta2.pdf",
+      "mimeType": "application/pdf",
+      "fileSize": 2048,
+      "storageKey": null,
+      "createdAt": "2026-08-26T14:04:24.688Z"
+    },
+    "medications": [
+      {
+        "id": "dev-med-1787753064688-0",
+        "requestId": "dev-1787753064688",
+        "commercialName": "Ibupirac 400mg",
+        "activeIngredient": "Ibuprofeno",
+        "concentration": "400mg",
+        "tabletQuantity": 20,
+        "createdAt": "2026-08-26T14:04:24.688Z"
+      }
+    ]
+  },
+  {
+    "id": "dev-1787753064663",
+    "sequence": 3,
+    "requestNumber": "S-100003",
+    "customerId": null,
+    "requesterName": "Alfredo Prueba 1",
+    "requesterPhone": "+56987654321",
+    "requesterEmail": "soyalfredo.dev@gmail.com",
+    "requesterRut": "12345678-1",
+    "requesterCity": "Santiago",
+    "patientName": null,
+    "patientRut": null,
+    "status": "ACCEPTED",
+    "price": null,
+    "acceptsPolicies": true,
+    "acceptsDataTreatment": true,
+    "createdAt": "2026-08-26T14:04:24.663Z",
+    "updatedAt": "2026-08-26T14:14:55.646Z",
+    "customer": null,
+    "prescription": {
+      "id": "dev-prescription-1787753064663",
+      "requestId": "dev-1787753064663",
+      "fileName": "receta1.pdf",
+      "mimeType": "application/pdf",
+      "fileSize": 1024,
+      "storageKey": null,
+      "createdAt": "2026-08-26T14:04:24.663Z"
+    },
+    "medications": [
+      {
+        "id": "dev-med-1787753064663-0",
+        "requestId": "dev-1787753064663",
+        "commercialName": "Metformina 500mg",
+        "activeIngredient": "Metformina",
+        "concentration": "500mg",
+        "tabletQuantity": 30,
+        "createdAt": "2026-08-26T14:04:24.663Z"
+      }
+    ]
+  },
+  {
+    "id": "dev-1787752642514",
+    "sequence": 2,
+    "requestNumber": "S-100002",
+    "customerId": null,
+    "requesterName": "Alfredo Test",
+    "requesterPhone": "+56987654321",
+    "requesterEmail": "soyalfredo.dev@gmail.com",
+    "requesterRut": "12345678-9",
+    "requesterCity": "Santiago",
+    "patientName": null,
+    "patientRut": null,
+    "status": "RECEIVED",
+    "price": null,
+    "acceptsPolicies": true,
+    "acceptsDataTreatment": true,
+    "createdAt": "2026-08-26T13:57:22.514Z",
+    "updatedAt": "2026-08-26T13:57:22.514Z",
+    "customer": null,
+    "prescription": {
+      "id": "dev-prescription-1787752642514",
+      "requestId": "dev-1787752642514",
+      "fileName": "test.pdf",
+      "mimeType": "application/pdf",
+      "fileSize": 1024,
+      "storageKey": null,
+      "createdAt": "2026-08-26T13:57:22.514Z"
+    },
+    "medications": [
+      {
+        "id": "dev-med-1787752642514-0",
+        "requestId": "dev-1787752642514",
+        "commercialName": "Metformina 500mg",
+        "activeIngredient": "Metformina",
+        "concentration": "500mg",
+        "tabletQuantity": 30,
+        "createdAt": "2026-08-26T13:57:22.514Z"
+      }
+    ]
+  },
+  {
     "id": "dev-1787702151232",
     "sequence": 1,
     "requestNumber": "S-100001",

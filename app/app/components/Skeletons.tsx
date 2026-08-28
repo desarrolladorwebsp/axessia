@@ -5,7 +5,7 @@ export function SkeletonTable({ rows = 5 }: { rows?: number }) {
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="grid grid-cols-6 gap-4 px-6 py-4 bg-[var(--background)] rounded-lg">
+      <div className="grid grid-cols-6 gap-4 px-6 py-4 bg-[var(--background)] rounded-2xl">
         {[...Array(6)].map((_, i) => (
           <div
             key={i}
@@ -18,7 +18,7 @@ export function SkeletonTable({ rows = 5 }: { rows?: number }) {
       {[...Array(rows)].map((_, i) => (
         <div
           key={i}
-          className="grid grid-cols-6 gap-4 px-6 py-4 bg-white rounded-lg border border-[var(--border)] animate-pulse"
+          className="grid grid-cols-6 gap-4 px-6 py-4 bg-white rounded-2xl border border-[var(--border)] animate-pulse"
         >
           {[...Array(6)].map((_, j) => (
             <div
@@ -74,7 +74,7 @@ export function SkeletonList({ items = 5 }: { items?: number }) {
       {[...Array(items)].map((_, i) => (
         <div
           key={i}
-          className="flex items-center gap-4 p-4 bg-white rounded-lg border border-[var(--border)] animate-pulse"
+          className="flex items-center gap-4 p-4 bg-white rounded-2xl border border-[var(--border)] animate-pulse"
         >
           <div className="w-12 h-12 bg-gray-200 rounded-full" />
           <div className="flex-1 space-y-2">

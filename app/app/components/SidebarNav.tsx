@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { LayoutDashboard, FileText, Users } from "lucide-react";
+import { LayoutDashboard, FileText, Users, UserRound, Settings2, ReceiptText } from "lucide-react";
 
 interface SidebarNavProps {
   onNavigate?: () => void;
@@ -21,6 +21,17 @@ const navItems = [
     icon: FileText,
   },
   {
+    label: "Clientes",
+    href: "/app/clientes",
+    icon: UserRound,
+    badge: "24",
+  },
+  {
+    label: "Cotizaciones",
+    href: "/app/quotes",
+    icon: ReceiptText,
+  },
+  {
     label: "Usuarios",
     href: "/app/usuarios",
     icon: Users,
@@ -31,7 +42,9 @@ export default function SidebarNav({ onNavigate }: SidebarNavProps) {
   const pathname = usePathname();
 
   return (
-    <div className="space-y-2">
+    <div>
+      <p className="mb-3 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">Operación</p>
+      <div className="space-y-1">
       {navItems.map((item) => {
         const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
         const Icon = item.icon;
@@ -45,18 +58,25 @@ export default function SidebarNav({ onNavigate }: SidebarNavProps) {
             <Link
               href={item.href}
               onClick={onNavigate}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg font-medium text-sm transition-all ${
+              className={`flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all ${
                 isActive
-                  ? "bg-[var(--cyan)] text-white shadow-lg shadow-[var(--cyan)]/20"
-                  : "text-white/70 hover:text-white hover:bg-white/10"
+                  ? "bg-white text-[var(--navy)] shadow-[0_10px_24px_rgba(0,0,0,0.12)]"
+                  : "text-white/60 hover:bg-white/8 hover:text-white"
               }`}
             >
-              <Icon className="w-5 h-5" />
-              <span>{item.label}</span>
+              <Icon className="h-[18px] w-[18px]" />
+              <span className="flex-1">{item.label}</span>
+              {item.badge && <span className={`rounded-full px-2 py-0.5 text-[10px] ${isActive ? "bg-[var(--blue)] text-white" : "bg-white/10 text-white/50"}`}>{item.badge}</span>}
             </Link>
           </motion.div>
         );
       })}
+      </div>
+      <p className="mb-3 mt-9 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-white/35">Configuración</p>
+      <Link href="#" className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold text-white/60 hover:bg-white/8 hover:text-white">
+        <Settings2 className="h-[18px] w-[18px]" />
+        <span>Preferencias</span>
+      </Link>
     </div>
   );
 }

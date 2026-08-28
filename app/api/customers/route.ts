@@ -46,18 +46,32 @@ export async function POST(request: Request) {
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
-  const customer = await prisma.customer.create({
-    data: {
-      name,
-      phone,
-      email,
-      rut,
-      city,
-      passwordHash,
-      hasPendingRequest: payload.hasPendingRequest === true,
-      promotionsConsent: payload.promotionsConsent === true,
-    },
-    select: { id: true, name: true, email: true, hasPendingRequest: true, createdAt: true },
+  const customer = await prisma.$transaction(async (transaction) => {
+    const createdCustomer = await transaction.customer.create({
+      data: {
+        name,
+        phone,
+        email,
+        rut,
+        city,
+        passwordHash,
+        hasPendingRequest: payload.hasPendingRequest === true,
+        promotionsConsent: payload.promotionsConsent === true,
+      },
+      select: { id: true, name: true, email: true, hasPendingRequest: true, createdAt: true },
+    });
+
+    const pendingRequests = await transaction.quoteRequest.findMany({
+      where: { customerId: null, OR: [{ requesterEmail: email }, { requesterRut: rut }] },
+      select: { id: true },
+    });
+    if (pendingRequests.length) {
+      const requestIds = pendingRequests.map((requestItem) => requestItem.id);
+      await transaction.quoteRequest.updateMany({ where: { id: { in: requestIds } }, data: { customerId: createdCustomer.id } });
+      await transaction.prescription.updateMany({ where: { requestId: { in: requestIds }, customerId: null }, data: { customerId: createdCustomer.id } });
+    }
+
+    return createdCustomer;
   });
 
   return NextResponse.json(customer, { status: 201 });

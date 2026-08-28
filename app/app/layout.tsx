@@ -13,10 +13,10 @@ type LayoutProps = {
 
 export default function AppLayout({ children }: LayoutProps) {
   return (
-    <div className="app-system flex h-screen overflow-hidden bg-[var(--background)]">
+    <div className="app-system flex min-h-screen bg-[var(--background)]">
       <Sidebar />
-      <main className="app-main-content flex-1 flex flex-col overflow-hidden md:mt-0 mt-[92px]">
-        <div className="app-content flex-1 overflow-y-auto">
+      <main className="app-main-content min-w-0 flex-1 flex flex-col md:ml-64">
+        <div className="app-content flex-1">
           {children}
         </div>
       </main>
