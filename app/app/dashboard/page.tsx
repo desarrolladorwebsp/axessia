@@ -56,7 +56,7 @@ export default function DashboardPage() {
     fetchDashboardData();
   }, []);
 
-  const reviewing = data ? data.quotes.filter((request) => ["RECEIVED", "REVIEWING"].includes(request.status)).length : 0;
+  const inManagement = data ? data.quotes.filter((request) => ["RECEIVED", "SOURCING"].includes(request.status)).length : 0;
   const quoted = data ? data.quotes.filter((request) => request.status === "QUOTED").length : 0;
 
   const container = {
@@ -94,7 +94,7 @@ export default function DashboardPage() {
         <motion.div variants={container} initial="hidden" animate="visible" className="space-y-5">
           <motion.section variants={item} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <MetricCard label="Solicitudes" value={data ? String(data.pagination.total) : "0"} detail="Solicitudes recibidas" trend="+12%" icon={FileCheck2} tone="violet" />
-            <MetricCard label="En revisión" value={String(reviewing)} detail="Pendientes por análisis" trend="+6%" icon={ClipboardList} tone="yellow" />
+            <MetricCard label="En gestión" value={String(inManagement)} detail="Pendientes por gestionar" trend="+6%" icon={ClipboardList} tone="yellow" />
             <MetricCard label="Cotizadas" value={String(quoted)} detail="Solicitudes con cotización" trend="+9%" icon={ReceiptText} tone="green" />
           </motion.section>
 
@@ -105,7 +105,7 @@ export default function DashboardPage() {
                 {data ? (
                   [
                     { label: "Recibidas", total: data.quotes.filter((request) => request.status === "RECEIVED").length },
-                    { label: "En revisión", total: data.quotes.filter((request) => request.status === "REVIEWING").length },
+                    { label: "En gestión", total: data.quotes.filter((request) => request.status === "SOURCING").length },
                     { label: "Cotizadas", total: data.quotes.filter((request) => request.status === "QUOTED").length },
                   ].map((status) => (
                     <div key={status.label} className="flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 py-3">

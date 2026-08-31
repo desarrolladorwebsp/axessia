@@ -9,11 +9,45 @@ type AccountType = "client" | "executive";
 
 export default function LoginView() {
   const [accountType, setAccountType] = useState<AccountType>("client");
-  const [isReady, setIsReady] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
-    setIsReady(true);
+    setError("");
+
+    if (accountType === "executive") {
+      setError("El acceso ejecutivo estará disponible próximamente.");
+      return;
+    }
+
+    if (!email.trim() || !password.trim()) {
+      setError("Ingresa tu correo y contraseña para continuar.");
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      });
+      const result = (await response.json()) as { error?: string; message?: string };
+
+      if (!response.ok) {
+        throw new Error(result.error ?? "No fue posible iniciar sesión.");
+      }
+
+      window.location.href = "/mi-cuenta";
+    } catch (submissionError) {
+      setError(submissionError instanceof Error ? submissionError.message : "No fue posible iniciar sesión.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -45,16 +79,16 @@ export default function LoginView() {
         <motion.form className="login-form" onSubmit={handleSubmit} initial="hidden" animate="visible" variants={{ visible: { transition: { staggerChildren: 0.08 } } }}>
           <motion.label className="login-field" htmlFor="login-email" variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}>
             <span>Correo electrónico</span>
-            <input id="login-email" type="email" placeholder="Ej: ana@correo.cl" autoComplete="email" required />
+            <input id="login-email" type="email" placeholder="Ej: ana@correo.cl" autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} required />
           </motion.label>
           <motion.label className="login-field" htmlFor="login-password" variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}>
             <span>Contraseña</span>
-            <input id="login-password" type="password" placeholder="Ingresa tu contraseña" autoComplete="current-password" required />
+            <input id="login-password" type="password" placeholder="Ingresa tu contraseña" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required />
           </motion.label>
           <button type="button" className="login-recovery">¿Olvidaste tu contraseña?</button>
-          {isReady && <motion.p className="login-notice" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}>El acceso quedará conectado próximamente.</motion.p>}
-          <button type="submit" className="login-submit">
-            Ingresar como {accountType === "client" ? "cliente" : "cliente ejecutivo"}
+          {error && <p className="register-message register-message-error">{error}</p>}
+          <button type="submit" className="login-submit" disabled={isSubmitting}>
+            {isSubmitting ? "Ingresando..." : `Ingresar como ${accountType === "client" ? "cliente" : "cliente ejecutivo"}`}
             <ArrowRight size={18} aria-hidden="true" />
           </button>
         </motion.form>

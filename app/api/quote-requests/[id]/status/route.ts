@@ -1,12 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readDevQuoteRequests, writeDevQuoteRequests, shouldUseJsonStorage } from "@/lib/dev-request-store";
+import { getAxessiaLegalDetails } from "@/lib/axessia-legal";
+import { generateMandatePdf } from "@/lib/mandate";
+import { sendMandateEmail } from "@/lib/services/email";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-type StatusPayload = { action?: unknown; executiveId?: unknown; reason?: unknown };
+type StatusPayload = { action?: unknown; executiveId?: unknown; reason?: unknown; note?: unknown; fileName?: unknown; mimeType?: unknown; fileSize?: unknown };
 
 function invalid(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -14,7 +17,7 @@ function invalid(message: string, status = 400) {
 
 // Roles allowed to be assigned as the executive responsible for a request.
 const manageableRoles = ["EJECUTIVO", "ADMINISTRADOR"];
-const rejectableStatuses = ["RECEIVED", "REVIEWING", "SOURCING", "QUOTED", "AWAITING_DECISION"];
+const rejectableStatuses = ["RECEIVED", "SOURCING", "QUOTED", "AWAITING_DECISION"];
 
 export async function POST(request: NextRequest, { params }: RouteContext) {
   const { id } = await params;
@@ -22,7 +25,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
     const payload = (await request.json()) as StatusPayload;
     const action = payload.action;
-    if (action !== "CONFIRM_MANAGEMENT" && action !== "REJECT") return invalid("Acción no válida");
+    if (action !== "CONFIRM_MANAGEMENT" && action !== "REJECT" && action !== "START_SHIPPING" && action !== "COMPLETE" && action !== "SEND_MANDATE" && action !== "ATTACH_SIGNED_MANDATE") return invalid("Acción no válida");
 
     if (action === "CONFIRM_MANAGEMENT") {
       const executiveId = typeof payload.executiveId === "string" ? payload.executiveId.trim() : "";
@@ -65,6 +68,111 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       });
 
       return NextResponse.json({ status: updated.status, assignedExecutive: updated.assignedExecutive, updatedAt: updated.updatedAt.toISOString() });
+    }
+
+    if (action === "SEND_MANDATE") {
+      const company = getAxessiaLegalDetails();
+      if (!company) return invalid("Configura AXESSIA_LEGAL_NAME y AXESSIA_LEGAL_RUT antes de enviar el mandato", 409);
+      const note = typeof payload.note === "string" ? payload.note.trim().slice(0, 2000) : "";
+
+      if (shouldUseJsonStorage()) {
+        const records = await readDevQuoteRequests();
+        const index = records.findIndex((record) => record.id === id);
+        if (index === -1) return invalid("Solicitud no encontrada", 404);
+        const record = records[index];
+        const mandateName = record.patientName || record.requesterName;
+        const mandateRut = record.patientRut || record.requesterRut;
+        if (!mandateName || !mandateRut || !record.medications.length) return invalid("La solicitud no tiene información suficiente para generar el mandato", 409);
+        const fileName = `Mandato-AXESSIA-${record.requestNumber}.pdf`;
+        const pdf = await generateMandatePdf({ requestNumber: record.requestNumber, mandateName, mandateRut, condition: null, medications: record.medications }, company);
+        await sendMandateEmail(record.requesterEmail, record.requesterName, record.requestNumber, fileName, pdf);
+        const now = new Date().toISOString();
+        records[index] = {
+          ...record,
+          updatedAt: now,
+          generatedMandate: record.generatedMandate ?? { id: `dev-generated-mandate-${record.id}`, requestId: record.id, fileName, storageKey: `mandate-${record.id}`, generatedAt: now, sentAt: now },
+          events: [{ id: `dev-event-${Date.now()}`, status: record.status, eventType: "MANDATE_GENERATED_AND_SENT", note: note || null, createdAt: now }, ...(record.events ?? [])],
+        };
+        await writeDevQuoteRequests(records);
+        return NextResponse.json({ status: record.status, updatedAt: now, mandateUrl: `/api/mandates/${record.id}/pdf` });
+      }
+
+      const record = await prisma.quoteRequest.findUnique({
+        where: { id },
+        select: { id: true, requestNumber: true, requesterName: true, requesterEmail: true, requesterRut: true, patientName: true, patientRut: true, status: true, medications: { select: { commercialName: true, activeIngredient: true } } },
+      });
+      if (!record) return invalid("Solicitud no encontrada", 404);
+      const mandateName = record.patientName || record.requesterName;
+      const mandateRut = record.patientRut || record.requesterRut;
+      if (!record.requestNumber || !mandateName || !mandateRut || !record.medications.length) return invalid("La solicitud no tiene información suficiente para generar el mandato", 409);
+      const fileName = `Mandato-AXESSIA-${record.requestNumber}.pdf`;
+      const pdf = await generateMandatePdf({ requestNumber: record.requestNumber, mandateName, mandateRut, condition: null, medications: record.medications }, company);
+      await sendMandateEmail(record.requesterEmail, record.requesterName, record.requestNumber, fileName, pdf);
+      const now = new Date();
+      await prisma.$transaction([
+        prisma.generatedMandate.upsert({ where: { requestId: record.id }, update: { fileName, sentAt: now }, create: { requestId: record.id, fileName, storageKey: `mandate-${record.id}`, sentAt: now } }),
+        prisma.quoteRequestEvent.create({ data: { requestId: record.id, status: record.status, eventType: "MANDATE_GENERATED_AND_SENT", note: note || null } }),
+      ]);
+      return NextResponse.json({ status: record.status, updatedAt: now.toISOString(), mandateUrl: `/api/mandates/${record.id}/pdf` });
+    }
+
+    if (action === "ATTACH_SIGNED_MANDATE") {
+      const note = typeof payload.note === "string" ? payload.note.trim().slice(0, 2000) : "";
+      const fileName = typeof payload.fileName === "string" ? payload.fileName.trim() : "";
+      const mimeType = typeof payload.mimeType === "string" ? payload.mimeType.trim() : "";
+      const fileSize = typeof payload.fileSize === "number" && Number.isFinite(payload.fileSize) ? Math.trunc(payload.fileSize) : 0;
+      if (action === "ATTACH_SIGNED_MANDATE" && (!fileName || !mimeType || fileSize <= 0)) return invalid("Selecciona el mandato firmado para adjuntarlo");
+      const eventType = "SIGNED_MANDATE_ATTACHED";
+
+      if (shouldUseJsonStorage()) {
+        const records = await readDevQuoteRequests();
+        const index = records.findIndex((record) => record.id === id);
+        if (index === -1) return invalid("Solicitud no encontrada", 404);
+        const now = new Date().toISOString();
+        const mandateDocuments = action === "ATTACH_SIGNED_MANDATE"
+          ? [{ id: `dev-mandate-${Date.now()}`, requestId: id, fileName, mimeType, fileSize, storageKey: null, createdAt: now }, ...(records[index].mandateDocuments ?? [])]
+          : records[index].mandateDocuments;
+        records[index] = { ...records[index], updatedAt: now, mandateDocuments, events: [{ id: `dev-event-${Date.now()}`, status: records[index].status, eventType, note: note || null, createdAt: now }, ...(records[index].events ?? [])] };
+        await writeDevQuoteRequests(records);
+        return NextResponse.json({ status: records[index].status, updatedAt: now });
+      }
+
+      const existing = await prisma.quoteRequest.findUnique({ where: { id }, select: { status: true } });
+      if (!existing) return invalid("Solicitud no encontrada", 404);
+      const updated = await prisma.$transaction(async (transaction) => {
+        if (action === "ATTACH_SIGNED_MANDATE") await transaction.mandateDocument.create({ data: { requestId: id, fileName, mimeType, fileSize } });
+        const event = await transaction.quoteRequestEvent.create({ data: { requestId: id, status: existing.status, eventType, note: note || null } });
+        return event;
+      });
+      return NextResponse.json({ status: existing.status, updatedAt: updated.createdAt.toISOString() });
+    }
+
+    if (action === "START_SHIPPING" || action === "COMPLETE") {
+      const transition = action === "START_SHIPPING"
+        ? { expected: "ACCEPTED", next: "SHIPPING", eventType: "SHIPPING_STARTED" }
+        : { expected: "SHIPPING", next: "COMPLETED", eventType: "REQUEST_COMPLETED" };
+      const note = typeof payload.note === "string" ? payload.note.trim().slice(0, 2000) : "";
+
+      if (shouldUseJsonStorage()) {
+        const records = await readDevQuoteRequests();
+        const index = records.findIndex((record) => record.id === id);
+        if (index === -1) return invalid("Solicitud no encontrada", 404);
+        if (records[index].status !== transition.expected) return invalid("La solicitud no está disponible para esta acción", 409);
+        const now = new Date().toISOString();
+        records[index] = { ...records[index], status: transition.next as typeof records[number]["status"], updatedAt: now, events: [{ id: `dev-event-${Date.now()}`, status: transition.next, eventType: transition.eventType, note: note || null, createdAt: now }, ...(records[index].events ?? [])] };
+        await writeDevQuoteRequests(records);
+        return NextResponse.json({ status: transition.next, updatedAt: now });
+      }
+
+      const existing = await prisma.quoteRequest.findUnique({ where: { id }, select: { status: true } });
+      if (!existing) return invalid("Solicitud no encontrada", 404);
+      if (existing.status !== transition.expected) return invalid("La solicitud no está disponible para esta acción", 409);
+      const updated = await prisma.$transaction(async (transaction) => {
+        const request = await transaction.quoteRequest.update({ where: { id }, data: { status: transition.next as "SHIPPING" | "COMPLETED" }, select: { status: true, updatedAt: true } });
+        await transaction.quoteRequestEvent.create({ data: { requestId: id, status: request.status, eventType: transition.eventType, note: note || null } });
+        return request;
+      });
+      return NextResponse.json({ status: updated.status, updatedAt: updated.updatedAt.toISOString() });
     }
 
     // action === "REJECT"

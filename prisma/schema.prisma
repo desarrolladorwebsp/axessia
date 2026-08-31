@@ -9,11 +9,11 @@ datasource db {
 
 enum QuoteRequestStatus {
   RECEIVED
-  REVIEWING
   SOURCING
   QUOTED
   AWAITING_DECISION
   ACCEPTED
+  SHIPPING
   REJECTED
   CANCELLED
   COMPLETED
@@ -90,17 +90,67 @@ model QuoteRequest {
   customer             Customer?             @relation(fields: [customerId], references: [id], onDelete: SetNull)
   assignedExecutive    User?                 @relation("AssignedExecutiveRequests", fields: [assignedExecutiveId], references: [id], onDelete: SetNull)
   prescriptions        Prescription[]
+  clientDocuments      ClientDocument[]
+  generatedMandate     GeneratedMandate?
+  mandateDocuments     MandateDocument[]
   medications          Medication[]
   quotes               Quote[]
   comments             QuoteRequestComment[]
   internalNotes        QuoteRequestNote[]
   events               QuoteRequestEvent[]
+  notifications        Notification[]
 
   @@index([customerId])
   @@index([status])
   @@index([requesterEmail])
   @@index([requesterRut])
   @@index([assignedExecutiveId])
+}
+
+model GeneratedMandate {
+  id        String       @id @default(cuid())
+  requestId String       @unique
+  fileName  String
+  storageKey String      @unique
+  generatedAt DateTime   @default(now())
+  sentAt    DateTime?
+  request   QuoteRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+}
+
+model ClientDocument {
+  id        String       @id @default(cuid())
+  requestId String
+  fileName  String
+  mimeType  String
+  fileSize  Int
+  storageKey String?
+  createdAt DateTime     @default(now())
+  request   QuoteRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
+}
+
+model MandateDocument {
+  id        String       @id @default(cuid())
+  requestId String
+  fileName  String
+  mimeType  String
+  fileSize  Int
+  storageKey String?
+  createdAt DateTime     @default(now())
+  request   QuoteRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
+}
+
+model Notification {
+  id        String       @id @default(cuid())
+  requestId String       @unique
+  isRead    Boolean      @default(false)
+  createdAt DateTime     @default(now())
+  request   QuoteRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([isRead, createdAt])
 }
 
 model Prescription {

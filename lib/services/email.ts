@@ -10,6 +10,10 @@ if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.trim()) {
   resend = new Resend(process.env.RESEND_API_KEY);
 }
 
+export function isEmailDeliveryConfigured() {
+  return resend !== null;
+}
+
 export type EmailType = "quote_request_received" | "quote_ready" | "quote_accepted" | "quote_rejected";
 
 interface SendEmailParams {
@@ -17,6 +21,7 @@ interface SendEmailParams {
   subject: string;
   html: string;
   replyTo?: string;
+  attachments?: Array<{ filename: string; content: Buffer }>;
 }
 
 /**
@@ -61,6 +66,7 @@ async function sendEmailAsync(params: SendEmailParams): Promise<void> {
       subject: params.subject,
       html: params.html,
       replyTo: params.replyTo,
+      attachments: params.attachments,
     });
 
     console.log("[Email] Successfully sent email to:", params.to);
@@ -68,6 +74,16 @@ async function sendEmailAsync(params: SendEmailParams): Promise<void> {
     // Errors are already logged by sendEmail caller
     throw error;
   }
+}
+
+export async function sendMandateEmail(customerEmail: string, customerName: string, requestNumber: string, fileName: string, pdf: Uint8Array): Promise<void> {
+  if (!isEmailDeliveryConfigured()) throw new Error("El envío de correo no está configurado.");
+  await sendEmailAwaited({
+    to: customerEmail,
+    subject: `Mandato para firma y notarización - ${requestNumber}`,
+    html: `<p>Hola ${customerName},</p><p>Adjuntamos el mandato AXESSIA asociado a tu solicitud ${requestNumber}. Revísalo, fírmalo y realiza la gestión notarial que corresponda. Luego, devuélvelo a AXESSIA por los canales indicados.</p><p>Saludos,<br />Equipo AXESSIA</p>`,
+    attachments: [{ filename: fileName, content: Buffer.from(pdf) }],
+  });
 }
 
 /**

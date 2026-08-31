@@ -43,7 +43,16 @@ export async function POST(request: NextRequest) {
       const now = new Date().toISOString();
       const quote: DevQuoteRecord = { id: `dev-quote-${Date.now()}`, sequence, quoteNumber: `C-${10000 + sequence}`, customerId, requestId, customer, request: { id: source.id, requestNumber: source.requestNumber, requesterName: source.requesterName, requesterEmail: source.requesterEmail }, version: quotes.filter((item) => item.requestId === requestId).length + 1, status, total, validUntil: validUntil ? validUntil.toISOString() : null, createdAt: now, sentAt: null, items: items.map((item, index) => ({ ...item, expirationDate: item.expirationDate ? item.expirationDate.toISOString() : null, id: `dev-quote-item-${Date.now()}-${index}` })) };
       await writeDevQuotes([quote, ...quotes]);
-      requests[recordIndex] = { ...source, customerId, customer, status: asDraft ? source.status : "QUOTED", updatedAt: now };
+      requests[recordIndex] = {
+        ...source,
+        customerId,
+        customer,
+        status: asDraft ? source.status : "QUOTED",
+        updatedAt: now,
+        events: asDraft || source.status === "QUOTED"
+          ? source.events
+          : [{ id: `dev-event-${Date.now()}`, status: "QUOTED", eventType: "QUOTE_CREATED", createdAt: now }, ...(source.events ?? [])],
+      };
       await writeDevQuoteRequests(requests);
       return NextResponse.json(quote, { status: 201 });
     }
@@ -60,7 +69,10 @@ export async function POST(request: NextRequest) {
       const latest = await transaction.quote.findFirst({ where: { requestId }, orderBy: { version: "desc" }, select: { version: true } });
       const created = await transaction.quote.create({ data: { customerId, requestId, version: (latest?.version ?? 0) + 1, status, total, validUntil, items: { create: items } }, include: { items: true, customer: { select: { id: true, name: true, email: true } }, request: { select: { id: true, requestNumber: true, requesterName: true, requesterEmail: true } } } });
       const numbered = await transaction.quote.update({ where: { id: created.id }, data: { quoteNumber: `C-${10000 + created.sequence}` }, include: { items: true, customer: { select: { id: true, name: true, email: true } }, request: { select: { id: true, requestNumber: true, requesterName: true, requesterEmail: true } } } });
-      if (!asDraft) await transaction.quoteRequest.update({ where: { id: requestId }, data: { status: "QUOTED" } });
+      if (!asDraft) {
+        await transaction.quoteRequest.update({ where: { id: requestId }, data: { status: "QUOTED" } });
+        await transaction.quoteRequestEvent.create({ data: { requestId, status: "QUOTED", eventType: "QUOTE_CREATED" } });
+      }
       return numbered;
     });
     return NextResponse.json({ ...quote, total: quote.total?.toString() ?? null, validUntil: quote.validUntil?.toISOString() ?? null, createdAt: quote.createdAt.toISOString(), updatedAt: quote.updatedAt.toISOString() }, { status: 201 });

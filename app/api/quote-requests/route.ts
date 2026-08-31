@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import { Prisma, type QuoteRequestStatus } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { shouldUseJsonStorage, readDevQuoteRequests, writeDevQuoteRequests } from "@/lib/dev-request-store";
+import { createDevRequestNotification, shouldUseJsonStorage, readDevQuoteRequests, writeDevQuoteRequests } from "@/lib/dev-request-store";
 import { sendQuoteRequestReceivedEmail, sendInternalQuoteRequestNotification } from "@/lib/services/email";
 
 type QuoteRequestPayload = {
@@ -169,10 +169,17 @@ export async function POST(request: Request) {
         tabletQuantity: medication.tabletQuantity,
         createdAt: now,
       })),
+      events: [{
+        id: `dev-event-${Date.now()}`,
+        status: "RECEIVED",
+        eventType: "REQUEST_RECEIVED",
+        createdAt: now,
+      }],
     };
 
     const nextRecords = [record, ...records];
     await writeDevQuoteRequests(nextRecords);
+    await createDevRequestNotification(record);
 
     // Send emails asynchronously (fire-and-forget)
     sendQuoteRequestReceivedEmail(
@@ -242,6 +249,10 @@ export async function POST(request: Request) {
         status: request.status,
         eventType: "REQUEST_RECEIVED",
       },
+    });
+
+    await transaction.notification.create({
+      data: { requestId: request.id },
     });
 
     return request;

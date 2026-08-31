@@ -9,6 +9,7 @@ import { QuoteTrigger } from "@/components/QuoteModal";
 
 const navigation = [
   { label: "Inicio", href: "/" },
+  { label: "Nosotros", href: "/nosotros" },
   { label: "Seguimiento", href: "/seguimiento" },
   { label: "Contacto", href: "/contacto" },
 ];

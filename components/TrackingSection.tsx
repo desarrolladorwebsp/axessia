@@ -6,11 +6,11 @@ import { ArrowRight, Check, LockKeyhole, Search } from "lucide-react";
 
 const stages = [
   ["01", "Recibida", "Tu solicitud fue recibida."],
-  ["02", "Revisión", "Estamos revisando la información."],
-  ["03", "Gestión", "Buscamos alternativas disponibles."],
-  ["04", "Cotización", "Te avisaremos cuando esté lista."],
+  ["02", "En gestión", "Gestionamos alternativas disponibles."],
+  ["03", "Cotizada", "La cotización está lista para enviar."],
+  ["04", "Esperando respuesta", "Te avisaremos cuando la cotización sea enviada."],
 ];
-const labels: Record<string, string> = { RECEIVED: "Recibida", REVIEWING: "En revisión", SOURCING: "En gestión", QUOTED: "Cotización disponible", AWAITING_DECISION: "Esperando tu decisión", ACCEPTED: "Aceptada", REJECTED: "Rechazada", CANCELLED: "Cancelada", COMPLETED: "Finalizada" };
+const labels: Record<string, string> = { RECEIVED: "Recibida", SOURCING: "En gestión", QUOTED: "Cotizada", AWAITING_DECISION: "Esperando respuesta", ACCEPTED: "Aceptada", SHIPPING: "En despacho", REJECTED: "Rechazada", CANCELLED: "Cancelada", COMPLETED: "Finalizada" };
 type Summary = { requestNumber: string; status: string; createdAt: string; updatedAt: string; medications: Array<{ commercialName: string; concentration: string; tabletQuantity: number }>; hasQuote: boolean };
 const date = (value: string) => new Intl.DateTimeFormat("es-CL", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 

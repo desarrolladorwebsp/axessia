@@ -31,8 +31,8 @@ interface PaginationData {
   pagination: { total: number; page: number; limit: number; pages: number };
 }
 
-const statusLabels: Record<string, string> = { RECEIVED: "Recibida", REVIEWING: "En revisión", SOURCING: "En gestión", QUOTED: "Cotizada", AWAITING_DECISION: "Esperando decisión", ACCEPTED: "Aceptada", REJECTED: "Rechazada", PROCESSING: "En proceso", COMPLETED: "Finalizada" };
-const statusTones: Record<string, StatusTone> = { RECEIVED: "info", REVIEWING: "warning", SOURCING: "progress", QUOTED: "accent", AWAITING_DECISION: "accent", ACCEPTED: "success", REJECTED: "danger", PROCESSING: "warning", COMPLETED: "neutral" };
+const statusLabels: Record<string, string> = { RECEIVED: "Recibida", SOURCING: "En gestión", QUOTED: "Cotizada", AWAITING_DECISION: "Esperando respuesta", ACCEPTED: "Aceptada", SHIPPING: "En despacho", REJECTED: "Rechazada", CANCELLED: "Cancelada", COMPLETED: "Finalizada" };
+const statusTones: Record<string, StatusTone> = { RECEIVED: "info", SOURCING: "progress", QUOTED: "accent", AWAITING_DECISION: "accent", ACCEPTED: "success", SHIPPING: "progress", REJECTED: "danger", CANCELLED: "neutral", COMPLETED: "neutral" };
 
 export default function SolicitudesPage() {
   const router = useRouter();
@@ -73,7 +73,7 @@ export default function SolicitudesPage() {
   );
 
   const received = data?.quotes.length ?? 0;
-  const inManagement = data?.quotes.filter((request) => ["RECEIVED", "REVIEWING", "SOURCING"].includes(request.status)).length ?? 0;
+  const inManagement = data?.quotes.filter((request) => ["RECEIVED", "SOURCING"].includes(request.status)).length ?? 0;
   const quoted = data?.quotes.filter((request) => ["QUOTED", "AWAITING_DECISION"].includes(request.status)).length ?? 0;
 
   return (

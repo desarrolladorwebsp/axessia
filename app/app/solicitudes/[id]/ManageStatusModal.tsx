@@ -15,7 +15,7 @@ export type ManageStatusResult = {
   note?: { id: string; executiveName: string; message: string; createdAt: string };
 };
 
-type Step = "choose" | "assign-select" | "assign-confirm" | "reject";
+type Step = "choose" | "assign-select" | "assign-confirm" | "reject" | "shipping-confirm" | "complete-confirm";
 type Stage = "idle" | "submitting" | "success" | "error";
 
 const manageableRoles = ["EJECUTIVO", "ADMINISTRADOR"];
@@ -24,11 +24,13 @@ export default function ManageStatusModal({
   open,
   onClose,
   requestId,
+  currentStatus,
   onUpdated,
 }: {
   open: boolean;
   onClose: () => void;
   requestId: string;
+  currentStatus: string;
   onUpdated: (result: ManageStatusResult) => void;
 }) {
   const [step, setStep] = useState<Step>("choose");
@@ -114,10 +116,34 @@ export default function ManageStatusModal({
     }
   };
 
+  const confirmTransition = async (action: "START_SHIPPING" | "COMPLETE") => {
+    if (isBusy) return;
+    try {
+      setStage("submitting");
+      setError("");
+      const response = await fetch(`/api/quote-requests/${requestId}/status`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action }),
+      });
+      const result = (await response.json()) as { error?: string } & ManageStatusResult;
+      if (!response.ok) throw new Error(result.error || "No fue posible actualizar la solicitud");
+      onUpdated(result);
+      setStage("success");
+    } catch (submitError) {
+      setStage("error");
+      setError(submitError instanceof Error ? submitError.message : "No fue posible actualizar la solicitud");
+    }
+  };
+
   const title =
     stage === "success"
       ? step === "reject"
         ? "Solicitud rechazada"
+        : step === "shipping-confirm"
+          ? "Despacho iniciado"
+          : step === "complete-confirm"
+            ? "Solicitud finalizada"
         : "Gestión confirmada"
       : step === "reject"
         ? "Rechazar solicitud"
@@ -125,6 +151,10 @@ export default function ManageStatusModal({
           ? "Confirmar asignación"
           : step === "assign-select"
             ? "Asignar ejecutivo responsable"
+            : step === "shipping-confirm"
+              ? "Iniciar despacho"
+              : step === "complete-confirm"
+                ? "Finalizar solicitud"
             : "Gestionar estado";
 
   return (
@@ -155,6 +185,16 @@ export default function ManageStatusModal({
               {isBusy ? "Confirmando..." : "Confirmar asignación"}
             </PrimaryButton>
           </div>
+        ) : step === "shipping-confirm" ? (
+          <div className="flex justify-end gap-2">
+            <SecondaryButton size="sm" onClick={() => setStep("choose")} disabled={isBusy}>Cancelar</SecondaryButton>
+            <PrimaryButton size="sm" onClick={() => confirmTransition("START_SHIPPING")} disabled={isBusy} icon={isBusy ? Loader2 : undefined} className={isBusy ? "[&_svg]:animate-spin" : ""}>{isBusy ? "Actualizando..." : "Confirmar despacho"}</PrimaryButton>
+          </div>
+        ) : step === "complete-confirm" ? (
+          <div className="flex justify-end gap-2">
+            <SecondaryButton size="sm" onClick={() => setStep("choose")} disabled={isBusy}>Cancelar</SecondaryButton>
+            <PrimaryButton size="sm" onClick={() => confirmTransition("COMPLETE")} disabled={isBusy} icon={isBusy ? Loader2 : undefined} className={isBusy ? "[&_svg]:animate-spin" : ""}>{isBusy ? "Actualizando..." : "Finalizar solicitud"}</PrimaryButton>
+          </div>
         ) : (
           <div className="flex justify-end gap-2">
             <SecondaryButton size="sm" onClick={() => setStep("choose")} disabled={isBusy}>Cancelar</SecondaryButton>
@@ -169,12 +209,12 @@ export default function ManageStatusModal({
         <div className="flex flex-col items-center gap-3 py-6 text-center">
           <CheckCircle2 className="h-6 w-6 text-emerald-600" />
           <p className="text-sm font-semibold text-[var(--navy)]">
-            {step === "reject" ? "La solicitud fue marcada como rechazada." : "El ejecutivo fue asignado y la solicitud pasó a En gestión."}
+            {step === "reject" ? "La solicitud fue marcada como rechazada." : step === "shipping-confirm" ? "La solicitud pasó a En despacho." : step === "complete-confirm" ? "La solicitud fue marcada como finalizada." : "El ejecutivo fue asignado y la solicitud pasó a En gestión."}
           </p>
         </div>
       ) : step === "choose" ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
-          <button
+          {currentStatus === "RECEIVED" && <button
             type="button"
             onClick={() => setStep("assign-select")}
             className="flex w-full items-start gap-3 rounded-xl border border-[var(--border)] p-4 text-left transition hover:border-[var(--blue)] hover:bg-[var(--background)]"
@@ -184,8 +224,24 @@ export default function ManageStatusModal({
               <p className="text-sm font-bold text-[var(--navy)]">Confirmar recepción / iniciar gestión</p>
               <p className="mt-1 text-xs text-[var(--text-secondary)]">Asigna un ejecutivo responsable y mueve la solicitud a &quot;En gestión&quot;.</p>
             </div>
-          </button>
-          <button
+          </button>}
+          {currentStatus === "ACCEPTED" && <button
+            type="button"
+            onClick={() => setStep("shipping-confirm")}
+            className="flex w-full items-start gap-3 rounded-xl border border-[var(--border)] p-4 text-left transition hover:border-[var(--blue)] hover:bg-[var(--background)]"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-[var(--blue)]"><UserCog className="h-4 w-4" /></div>
+            <div><p className="text-sm font-bold text-[var(--navy)]">Iniciar despacho</p><p className="mt-1 text-xs text-[var(--text-secondary)]">Confirma que el medicamento entra en proceso de despacho o envío.</p></div>
+          </button>}
+          {currentStatus === "SHIPPING" && <button
+            type="button"
+            onClick={() => setStep("complete-confirm")}
+            className="flex w-full items-start gap-3 rounded-xl border border-[var(--border)] p-4 text-left transition hover:border-[var(--blue)] hover:bg-[var(--background)]"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-emerald-600"><CheckCircle2 className="h-4 w-4" /></div>
+            <div><p className="text-sm font-bold text-[var(--navy)]">Finalizar solicitud</p><p className="mt-1 text-xs text-[var(--text-secondary)]">Confirma que el proceso de despacho fue completado.</p></div>
+          </button>}
+          {["RECEIVED", "SOURCING", "QUOTED", "AWAITING_DECISION"].includes(currentStatus) && <button
             type="button"
             onClick={() => setStep("reject")}
             className="flex w-full items-start gap-3 rounded-xl border border-[var(--border)] p-4 text-left transition hover:border-rose-300 hover:bg-rose-50"
@@ -195,7 +251,8 @@ export default function ManageStatusModal({
               <p className="text-sm font-bold text-rose-700">Rechazar solicitud</p>
               <p className="mt-1 text-xs text-[var(--text-secondary)]">Registra un motivo obligatorio y marca la solicitud como rechazada.</p>
             </div>
-          </button>
+          </button>}
+          {!['RECEIVED', 'SOURCING', 'QUOTED', 'AWAITING_DECISION', 'ACCEPTED', 'SHIPPING'].includes(currentStatus) && <p className="rounded-xl border border-[var(--border)] bg-[var(--background)] p-4 text-sm text-[var(--text-secondary)]">No hay gestiones manuales disponibles para el estado actual.</p>}
         </motion.div>
       ) : step === "assign-select" ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
@@ -241,6 +298,11 @@ export default function ManageStatusModal({
               <p className="text-xs font-semibold text-rose-700">{error}</p>
             </div>
           )}
+        </motion.div>
+      ) : step === "shipping-confirm" || step === "complete-confirm" ? (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
+          <p className="text-sm text-[var(--text-secondary)]">{step === "shipping-confirm" ? "Al confirmar, la solicitud pasará a En despacho y el cambio quedará registrado en su historial." : "Al confirmar, la solicitud pasará a Finalizada y el cambio quedará registrado en su historial."}</p>
+          {stage === "error" && <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-600" /><p className="text-xs font-semibold text-rose-700">{error}</p></div>}
         </motion.div>
       ) : (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">

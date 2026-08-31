@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { readDevQuotes, writeDevQuotes, shouldUseJsonStorage } from "@/lib/dev-request-store";
+import { readDevQuoteRequests, readDevQuotes, writeDevQuoteRequests, writeDevQuotes, shouldUseJsonStorage } from "@/lib/dev-request-store";
 import { sendQuoteReadyEmail } from "@/lib/services/email";
 
 type RouteContext = {
@@ -29,12 +29,23 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
       const now = new Date().toISOString();
       quotes[index] = { ...quote, status: "SENT", sentAt: now };
       await writeDevQuotes(quotes);
+      const requests = await readDevQuoteRequests();
+      const requestIndex = requests.findIndex((request) => request.id === quote.requestId);
+      if (requestIndex >= 0 && requests[requestIndex].status !== "AWAITING_DECISION") {
+        requests[requestIndex] = {
+          ...requests[requestIndex],
+          status: "AWAITING_DECISION",
+          updatedAt: now,
+          events: [{ id: `dev-event-${Date.now()}`, status: "AWAITING_DECISION", eventType: "QUOTE_SENT", createdAt: now }, ...(requests[requestIndex].events ?? [])],
+        };
+        await writeDevQuoteRequests(requests);
+      }
       return NextResponse.json(quotes[index]);
     }
 
     const quote = await prisma.quote.findUnique({
       where: { id },
-      include: { customer: { select: { email: true, name: true } }, request: { select: { requestNumber: true } } },
+      include: { customer: { select: { email: true, name: true } }, request: { select: { id: true, requestNumber: true, status: true } } },
     });
     if (!quote) return NextResponse.json({ error: "Cotización no encontrada" }, { status: 404 });
 
@@ -52,7 +63,14 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: "No fue posible enviar la cotización al cliente. Intenta nuevamente." }, { status: 502 });
     }
 
-    const updated = await prisma.quote.update({ where: { id }, data: { status: "SENT", sentAt: new Date() } });
+    const updated = await prisma.$transaction(async (transaction) => {
+      const sent = await transaction.quote.update({ where: { id }, data: { status: "SENT", sentAt: new Date() } });
+      if (quote.request.status !== "AWAITING_DECISION") {
+        await transaction.quoteRequest.update({ where: { id: quote.request.id }, data: { status: "AWAITING_DECISION" } });
+        await transaction.quoteRequestEvent.create({ data: { requestId: quote.request.id, status: "AWAITING_DECISION", eventType: "QUOTE_SENT" } });
+      }
+      return sent;
+    });
     return NextResponse.json({
       ...updated,
       total: updated.total?.toString() ?? null,

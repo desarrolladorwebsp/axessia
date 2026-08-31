@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readTrackingToken } from "@/lib/public-tracking";
-import { readDevQuoteRequests, shouldUseJsonStorage } from "@/lib/dev-request-store";
+import { readDevQuoteRequests, readDevQuotes, shouldUseJsonStorage } from "@/lib/dev-request-store";
 
 function unauthorized() {
   return NextResponse.json({ error: "La sesión de seguimiento no es válida o expiró." }, { status: 401 });
@@ -14,6 +14,9 @@ export async function GET(request: NextRequest) {
   if (shouldUseJsonStorage()) {
     const record = (await readDevQuoteRequests()).find((item) => item.requestNumber === requestNumber);
     if (!record) return unauthorized();
+    const quote = (await readDevQuotes())
+      .filter((item) => item.requestId === record.id && item.status === "SENT")
+      .sort((first, second) => second.version - first.version)[0];
     return NextResponse.json({
       requestNumber: record.requestNumber,
       requesterName: record.requesterName || record.customer?.name || "",
@@ -22,8 +25,8 @@ export async function GET(request: NextRequest) {
       updatedAt: record.updatedAt,
       patientName: record.patientName,
       medications: record.medications.map(({ commercialName, activeIngredient, concentration, tabletQuantity }) => ({ commercialName, activeIngredient, concentration, tabletQuantity })),
-      hasQuote: false,
-      quote: null,
+      hasQuote: Boolean(quote),
+      quote: quote ?? null,
     });
   }
 

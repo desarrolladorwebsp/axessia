@@ -7,7 +7,7 @@ import { ArrowLeft, Check, CircleAlert, LoaderCircle } from "lucide-react";
 
 type Detail = { requestNumber: string; requesterName: string; status: string; createdAt: string; updatedAt: string; patientName: string | null; medications: Array<{ commercialName: string; activeIngredient: string; concentration: string; tabletQuantity: number }>; hasQuote: boolean; quote: { quoteNumber: string | null; version: number; total: string | number | null; validUntil: string | null; items: Array<{ productName: string; activeIngredient: string | null; concentration: string | null; quantity: number; unitPrice: string | number | null; totalPrice: string | number | null }> } | null };
 const date = (value: string) => new Intl.DateTimeFormat("es-CL", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
-const labels: Record<string, string> = { QUOTED: "Cotización disponible", AWAITING_DECISION: "Esperando tu decisión", ACCEPTED: "Aceptada", REJECTED: "Rechazada" };
+const labels: Record<string, string> = { QUOTED: "Cotizada", AWAITING_DECISION: "Esperando respuesta", ACCEPTED: "Aceptada", SHIPPING: "En despacho", COMPLETED: "Finalizada", REJECTED: "Rechazada", CANCELLED: "Cancelada" };
 
 export default function TrackingDetail({ requestNumber }: { requestNumber: string }) {
   const [detail, setDetail] = useState<Detail | null>(null); const [error, setError] = useState(""); const [comment, setComment] = useState(""); const [loading, setLoading] = useState(true); const [saving, setSaving] = useState(false); const [feedback, setFeedback] = useState("");

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readTrackingToken } from "@/lib/public-tracking";
-import { readDevQuoteRequests, writeDevQuoteRequests, shouldUseJsonStorage } from "@/lib/dev-request-store";
+import { readDevQuoteRequests, readDevQuotes, writeDevQuoteRequests, writeDevQuotes, shouldUseJsonStorage } from "@/lib/dev-request-store";
 import {
   sendQuoteAcceptedEmail,
   sendInternalQuoteAcceptedNotification,
@@ -21,10 +21,25 @@ export async function POST(request: NextRequest) {
     const index = records.findIndex((item) => item.requestNumber === requestNumber);
     if (index < 0) return NextResponse.json({ error: "La sesión de seguimiento no es válida." }, { status: 401 });
     const record = records[index];
-    if (!["QUOTED", "AWAITING_DECISION"].includes(record.status) || !comment) return NextResponse.json({ error: "Esta cotización ya no está disponible para esta acción." }, { status: 409 });
+    if (record.status !== "AWAITING_DECISION" || !comment) return NextResponse.json({ error: "Esta cotización ya no está disponible para esta acción." }, { status: 409 });
     const updatedAt = new Date().toISOString();
-    records[index] = { ...record, status: action === "comment" ? record.status : action === "accept" ? "ACCEPTED" : "REJECTED", updatedAt };
+    const nextStatus = action === "comment" ? record.status : action === "accept" ? "ACCEPTED" : "REJECTED";
+    records[index] = {
+      ...record,
+      status: nextStatus,
+      updatedAt,
+      events: action === "comment" ? record.events : [{ id: `dev-event-${Date.now()}`, status: nextStatus, eventType: action === "accept" ? "QUOTE_ACCEPTED" : "QUOTE_REJECTED", note: comment, createdAt: updatedAt }, ...(record.events ?? [])],
+    };
     await writeDevQuoteRequests(records);
+
+    if (action !== "comment") {
+      const quotes = await readDevQuotes();
+      const quoteIndex = quotes.findIndex((quote) => quote.requestId === record.id && quote.status === "SENT");
+      if (quoteIndex >= 0) {
+        quotes[quoteIndex] = { ...quotes[quoteIndex], status: action === "accept" ? "ACCEPTED" : "REJECTED" };
+        await writeDevQuotes(quotes);
+      }
+    }
 
     // Send email notifications (fire-and-forget)
     if (action === "accept") {
@@ -76,7 +91,7 @@ export async function POST(request: NextRequest) {
     },
   });
   const quote = record?.quotes[0];
-  if (!record || !quote || !["QUOTED", "AWAITING_DECISION"].includes(record.status) || (quote.validUntil && quote.validUntil < new Date())) {
+  if (!record || !quote || record.status !== "AWAITING_DECISION" || (quote.validUntil && quote.validUntil < new Date())) {
     return NextResponse.json({ error: "Esta cotización ya no está disponible para decisión." }, { status: 409 });
   }
 
