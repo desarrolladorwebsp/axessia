@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getDevNotifications, shouldUseJsonStorage } from "@/lib/dev-request-store";
+import { getInternalActor } from "@/lib/internal-access";
 
 export async function GET() {
+  if (!await getInternalActor()) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   try {
     if (shouldUseJsonStorage()) {
       const notifications = await getDevNotifications();

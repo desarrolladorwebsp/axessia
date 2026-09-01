@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readDevQuotes, readDevQuoteRequests, shouldUseJsonStorage, writeDevQuotes, writeDevQuoteRequests, type DevQuoteRecord } from "@/lib/dev-request-store";
 import { parseQuoteItems, computeQuoteTotal, parseValidUntil, type QuoteItemPayload } from "@/lib/quote-items";
+import { normalizeSearchValue } from "@/lib/search";
+import { getInternalActor } from "@/lib/internal-access";
 
 const quoteStatuses = ["DRAFT", "READY", "SENT", "ACCEPTED", "REJECTED", "EXPIRED", "VOIDED"] as const;
 
@@ -12,6 +14,7 @@ function invalid(message: string) {
 }
 
 export async function POST(request: NextRequest) {
+  if (!await getInternalActor()) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   try {
     const payload = (await request.json()) as QuotePayload;
     const asDraft = payload.asDraft === true;
@@ -58,8 +61,9 @@ export async function POST(request: NextRequest) {
     }
 
     const quote = await prisma.$transaction(async (transaction) => {
-      const source = await transaction.quoteRequest.findUnique({ where: { id: requestId }, select: { id: true, customerId: true, requesterName: true, requesterPhone: true, requesterEmail: true, requesterRut: true, requesterCity: true } });
+      const source = await transaction.quoteRequest.findUnique({ where: { id: requestId }, select: { id: true, status: true, customerId: true, requesterName: true, requesterPhone: true, requesterEmail: true, requesterRut: true, requesterCity: true } });
       if (!source) throw new Error("Solicitud no encontrada");
+      if (!["SOURCING", "QUOTED"].includes(source.status)) throw new Error("La solicitud no está disponible para crear una cotización");
       let customerId = source.customerId;
       if (!customerId) {
         const existingCustomer = await transaction.customer.findFirst({ where: { OR: [{ email: source.requesterEmail }, { rut: source.requesterRut }] }, select: { id: true } });
@@ -77,7 +81,7 @@ export async function POST(request: NextRequest) {
     });
     return NextResponse.json({ ...quote, total: quote.total?.toString() ?? null, validUntil: quote.validUntil?.toISOString() ?? null, createdAt: quote.createdAt.toISOString(), updatedAt: quote.updatedAt.toISOString() }, { status: 201 });
   } catch (error) {
-    if (error instanceof Error && (error.message === "Solicitud no encontrada" || error.message.startsWith("Producto"))) return NextResponse.json({ error: error.message }, { status: error.message === "Solicitud no encontrada" ? 404 : 400 });
+    if (error instanceof Error && (error.message === "Solicitud no encontrada" || error.message.startsWith("Producto") || error.message === "La solicitud no está disponible para crear una cotización")) return NextResponse.json({ error: error.message }, { status: error.message === "Solicitud no encontrada" ? 404 : error.message === "La solicitud no está disponible para crear una cotización" ? 409 : 400 });
     console.error("Error creating quote:", error);
     return NextResponse.json({ error: "Error al crear la cotización" }, { status: 500 });
   }
@@ -86,6 +90,7 @@ export async function POST(request: NextRequest) {
 type QuoteStatusValue = (typeof quoteStatuses)[number];
 
 export async function GET(request: NextRequest) {
+  if (!await getInternalActor()) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   const searchParams = request.nextUrl.searchParams;
   const requestedPage = Number.parseInt(searchParams.get("page") || "1", 10);
   const requestedLimit = Number.parseInt(searchParams.get("limit") || "10", 10);
@@ -93,6 +98,8 @@ export async function GET(request: NextRequest) {
   const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 50) : 10;
   const statusParam = searchParams.get("status");
   const status = quoteStatuses.includes(statusParam as QuoteStatusValue) ? (statusParam as QuoteStatusValue) : undefined;
+  const rawQuery = searchParams.get("q") ?? "";
+  const normalizedQuery = normalizeSearchValue(rawQuery);
 
   try {
     if (shouldUseJsonStorage()) {
@@ -104,8 +111,22 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const where = status ? { status } : {};
-    const [quotes, total] = await Promise.all([
+    const where = {
+      ...(status ? { status } : {}),
+      ...(normalizedQuery
+        ? {
+            OR: [
+              { quoteNumber: { contains: normalizedQuery } },
+              { request: { is: { requestNumber: { contains: normalizedQuery } } } },
+              { request: { is: { requesterName: { contains: normalizedQuery } } } },
+              { request: { is: { requesterEmail: { contains: normalizedQuery } } } },
+              { request: { is: { customer: { is: { name: { contains: normalizedQuery } } } } } },
+              { request: { is: { customer: { is: { email: { contains: normalizedQuery } } } } } },
+            ],
+          }
+        : {}),
+    };
+    const [quotes, total, statusSummary] = await Promise.all([
       prisma.quote.findMany({
         where,
         orderBy: { createdAt: "desc" },
@@ -133,7 +154,21 @@ export async function GET(request: NextRequest) {
         },
       }),
       prisma.quote.count({ where }),
+      prisma.quote.groupBy({ by: ["status"], _count: { status: true }, where }),
     ]);
+
+    const statusCounts = Object.fromEntries(statusSummary.map((item) => [item.status, item._count.status]));
+    const summary = {
+      totalQuotes: total,
+      sent: statusCounts.SENT ?? 0,
+      accepted: statusCounts.ACCEPTED ?? 0,
+      pending: (statusCounts.DRAFT ?? 0) + (statusCounts.READY ?? 0),
+      draft: statusCounts.DRAFT ?? 0,
+      ready: statusCounts.READY ?? 0,
+      rejected: statusCounts.REJECTED ?? 0,
+      expired: statusCounts.EXPIRED ?? 0,
+      voided: statusCounts.VOIDED ?? 0,
+    };
 
     return NextResponse.json({
       quotes: quotes.map((quote) => ({
@@ -143,6 +178,7 @@ export async function GET(request: NextRequest) {
         createdAt: quote.createdAt.toISOString(),
         sentAt: quote.sentAt?.toISOString() ?? null,
       })),
+      summary,
       pagination: { total, page, limit, pages: Math.ceil(total / limit) },
     });
   } catch (error) {

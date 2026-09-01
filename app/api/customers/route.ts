@@ -1,7 +1,133 @@
 import bcrypt from "bcryptjs";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
+import { INTERNAL_SESSION_COOKIE, verifyInternalSessionToken } from "@/lib/auth";
 import { isValidRut, normalizeCustomerName, normalizeEmail, normalizeRut } from "@/lib/customer-validation";
+import { normalizeSearchValue } from "@/lib/search";
+import { getInternalActor } from "@/lib/internal-access";
+
+export async function GET(request: NextRequest) {
+  try {
+    const cookieStore = await cookies();
+    const sessionToken = cookieStore.get(INTERNAL_SESSION_COOKIE)?.value;
+    const auth = verifyInternalSessionToken(sessionToken);
+
+    if (!auth) {
+      return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+    }
+
+    const actor = await prisma.user.findUnique({ where: { id: auth.userId }, select: { id: true } });
+    if (!actor) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+
+    import { getInternalActor } from "@/lib/internal-access";
+    const { searchParams } = new URL(request.url);
+    const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.max(1, Math.min(Number.parseInt(searchParams.get("limit") || "10", 10), 50));
+    const rawQuery = searchParams.get("q") ?? "";
+    const statusFilter = searchParams.get("status") ?? "";
+    const normalizedQuery = normalizeSearchValue(rawQuery);
+    const skip = (page - 1) * limit;
+
+    const customers = await prisma.customer.findMany({
+      where: normalizedQuery
+        ? {
+            OR: [
+              { name: { contains: normalizedQuery } },
+              { email: { contains: normalizedQuery } },
+              { city: { contains: normalizedQuery } },
+              { rut: { contains: normalizedQuery } },
+            ],
+          }
+        : undefined,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        rut: true,
+      if ((payload as { internal?: unknown }).internal === true) {
+        if (!await getInternalActor()) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+        if (![firstName, lastName, phone, email, rut, city].every((value) => value && value.trim() !== "")) return NextResponse.json({ error: "Completa todos los campos obligatorios." }, { status: 400 });
+        if (!/^\S+@\S+\.\S+$/.test(email)) return NextResponse.json({ error: "Revisa el formato del correo." }, { status: 400 });
+        if (!isValidRut(rut)) return NextResponse.json({ error: "El RUT ingresado no es válido. Verifica el dígito verificador." }, { status: 400 });
+        const existing = await prisma.customer.findFirst({ where: { OR: [{ email }, { rut }] }, select: { id: true } });
+        if (existing) return NextResponse.json({ error: "El correo o RUT ya está registrado." }, { status: 409 });
+        const customer = await prisma.customer.create({ data: { name: fullName, phone, email, rut, city }, select: { id: true, name: true, email: true, phone: true, rut: true, city: true, createdAt: true } });
+        return NextResponse.json({ ...customer, createdAt: customer.createdAt.toISOString() }, { status: 201 });
+      }
+        city: true,
+        hasPendingRequest: true,
+        createdAt: true,
+        updatedAt: true,
+        _count: { select: { requests: true } },
+        requests: {
+          select: { status: true, updatedAt: true },
+          orderBy: { createdAt: "desc" },
+          take: 1,
+        },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    const customersWithStatus = customers.map((customer) => {
+      const latest = customer.requests[0];
+      const latestStatus = latest?.status ?? null;
+      const statusLabel = latestStatus && ["RECEIVED", "SOURCING", "QUOTED", "AWAITING_DECISION"].includes(latestStatus)
+        ? "En proceso"
+        : latestStatus && ["ACCEPTED", "SHIPPING", "COMPLETED"].includes(latestStatus)
+          ? "Activo"
+          : latestStatus && ["REJECTED", "CANCELLED"].includes(latestStatus)
+            ? "Finalizado"
+            : customer.hasPendingRequest
+              ? "Pendiente"
+              : "Pendiente";
+
+      return {
+        id: customer.id,
+        name: customer.name,
+        email: customer.email,
+        phone: customer.phone,
+        rut: customer.rut,
+        city: customer.city,
+        hasPendingRequest: customer.hasPendingRequest,
+        status: statusLabel,
+        requestCount: customer._count.requests,
+        lastActivity: latest?.updatedAt?.toISOString() ?? customer.updatedAt.toISOString(),
+        createdAt: customer.createdAt.toISOString(),
+      };
+    });
+
+    const filteredCustomers = customersWithStatus.filter((customer) => {
+      const statusMatch = !statusFilter || statusFilter === "Todos los estados" || customer.status === statusFilter;
+      return statusMatch;
+    });
+
+    const total = filteredCustomers.length;
+    const paginatedCustomers = filteredCustomers.slice(skip, skip + limit);
+
+    const summary = {
+      totalCustomers: total,
+      activeCustomers: filteredCustomers.filter((customer) => customer.status === "Activo").length,
+      inProcessCustomers: filteredCustomers.filter((customer) => customer.status === "En proceso").length,
+      pendingCustomers: filteredCustomers.filter((customer) => customer.status === "Pendiente").length,
+    };
+
+    return NextResponse.json({
+      customers: paginatedCustomers,
+      summary,
+      pagination: {
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error("Error fetching customers:", error);
+    return NextResponse.json({ error: "Error al obtener clientes" }, { status: 500 });
+  }
+}
 
 type RegistrationPayload = {
   name: string;
@@ -28,8 +154,9 @@ export async function POST(request: Request) {
   const password = (payload.password ?? "").trim();
   const confirmPassword = (payload.confirmPassword ?? "").trim();
   const fullName = normalizeCustomerName(`${firstName} ${lastName}`);
+  const isInternalCreation = (payload as { internal?: unknown }).internal === true;
 
-  if (![firstName, lastName, phone, email, rut, city, password].every((value) => value && value.trim() !== "")) {
+  if (![firstName, lastName, phone, email, rut, city, ...(isInternalCreation ? [] : [password])].every((value) => value && value.trim() !== "")) {
     return NextResponse.json({ error: "Completa todos los campos obligatorios." }, { status: 400 });
   }
 
@@ -39,6 +166,14 @@ export async function POST(request: Request) {
 
   if (!isValidRut(rut)) {
     return NextResponse.json({ error: "El RUT ingresado no es válido. Verifica el dígito verificador." }, { status: 400 });
+  }
+
+  if (isInternalCreation) {
+    if (!await getInternalActor()) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+    const existing = await prisma.customer.findFirst({ where: { OR: [{ email }, { rut }] }, select: { id: true } });
+    if (existing) return NextResponse.json({ error: "El correo o RUT ya está registrado." }, { status: 409 });
+    const customer = await prisma.customer.create({ data: { name: fullName, phone, email, rut, city }, select: { id: true, name: true, email: true, phone: true, rut: true, city: true, createdAt: true } });
+    return NextResponse.json({ ...customer, createdAt: customer.createdAt.toISOString() }, { status: 201 });
   }
 
   if (password.length < 8 || !/[A-Z]/.test(password) || !/[a-z]/.test(password) || !/\d/.test(password)) {

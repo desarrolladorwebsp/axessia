@@ -4,6 +4,7 @@ import { readDevQuoteRequests, writeDevQuoteRequests, shouldUseJsonStorage } fro
 import { getAxessiaLegalDetails } from "@/lib/axessia-legal";
 import { generateMandatePdf } from "@/lib/mandate";
 import { sendMandateEmail } from "@/lib/services/email";
+import { getInternalActor } from "@/lib/internal-access";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -21,6 +22,8 @@ const rejectableStatuses = ["RECEIVED", "SOURCING", "QUOTED", "AWAITING_DECISION
 
 export async function POST(request: NextRequest, { params }: RouteContext) {
   const { id } = await params;
+  const actor = await getInternalActor();
+  if (!actor) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
 
   try {
     const payload = (await request.json()) as StatusPayload;
@@ -62,7 +65,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
           select: { status: true, updatedAt: true, assignedExecutive: { select: { id: true, firstName: true, lastName: true } } },
         });
         await transaction.quoteRequestEvent.create({
-          data: { requestId: id, status: "SOURCING", eventType: "MANAGEMENT_CONFIRMED", actorId: executive.id },
+          data: { requestId: id, status: "SOURCING", eventType: "MANAGEMENT_CONFIRMED", actorId: actor.id },
         });
         return updatedRequest;
       });
@@ -102,6 +105,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         select: { id: true, requestNumber: true, requesterName: true, requesterEmail: true, requesterRut: true, patientName: true, patientRut: true, status: true, medications: { select: { commercialName: true, activeIngredient: true } } },
       });
       if (!record) return invalid("Solicitud no encontrada", 404);
+      if (record.status !== "ACCEPTED") return invalid("El mandato solo puede enviarse después de aceptar la cotización", 409);
       const mandateName = record.patientName || record.requesterName;
       const mandateRut = record.patientRut || record.requesterRut;
       if (!record.requestNumber || !mandateName || !mandateRut || !record.medications.length) return invalid("La solicitud no tiene información suficiente para generar el mandato", 409);
@@ -113,7 +117,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         prisma.generatedMandate.upsert({ where: { requestId: record.id }, update: { fileName, sentAt: now }, create: { requestId: record.id, fileName, storageKey: `mandate-${record.id}`, sentAt: now } }),
         prisma.quoteRequestEvent.create({ data: { requestId: record.id, status: record.status, eventType: "MANDATE_GENERATED_AND_SENT", note: note || null } }),
       ]);
-      return NextResponse.json({ status: record.status, updatedAt: now.toISOString(), mandateUrl: `/api/mandates/${record.id}/pdf` });
+      return NextResponse.json({ status: record.status, updatedAt: now.toISOString(), mandateUrl: `/api/mandates/${record.id}/pdf`, generatedMandate: { fileName, sentAt: now.toISOString() } });
     }
 
     if (action === "ATTACH_SIGNED_MANDATE") {

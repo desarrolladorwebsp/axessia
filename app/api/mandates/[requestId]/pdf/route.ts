@@ -3,6 +3,7 @@ import { getAxessiaLegalDetails } from "@/lib/axessia-legal";
 import { readDevQuoteRequests, shouldUseJsonStorage } from "@/lib/dev-request-store";
 import { generateMandatePdf } from "@/lib/mandate";
 import { prisma } from "@/lib/prisma";
+import { getInternalActor } from "@/lib/internal-access";
 
 type RouteContext = { params: Promise<{ requestId: string }> };
 
@@ -13,6 +14,7 @@ function pdfResponse(pdf: Uint8Array, fileName: string) {
 
 export async function GET(_request: Request, { params }: RouteContext) {
   const { requestId } = await params;
+  if (!await getInternalActor()) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   const company = getAxessiaLegalDetails();
   if (!company) return NextResponse.json({ error: "Falta la configuración legal de AXESSIA." }, { status: 409 });
 

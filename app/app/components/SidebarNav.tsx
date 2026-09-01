@@ -24,7 +24,6 @@ const navItems = [
     label: "Clientes",
     href: "/app/clientes",
     icon: UserRound,
-    badge: "24",
   },
   {
     label: "Cotizaciones",
@@ -66,7 +65,6 @@ export default function SidebarNav({ onNavigate }: SidebarNavProps) {
             >
               <Icon className="h-[18px] w-[18px]" />
               <span className="flex-1">{item.label}</span>
-              {item.badge && <span className={`rounded-full px-2 py-0.5 text-[10px] ${isActive ? "bg-[var(--blue)] text-white" : "bg-white/10 text-white/50"}`}>{item.badge}</span>}
             </Link>
           </motion.div>
         );

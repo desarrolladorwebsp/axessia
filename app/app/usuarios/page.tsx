@@ -1,7 +1,7 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
 import { Plus, ShieldCheck, UserCog, Users as UsersIcon } from "lucide-react";
 import { SkeletonTable } from "../components/Skeletons";
@@ -26,6 +26,10 @@ interface User {
 
 interface PaginationData {
   users: User[];
+  summary: {
+    administrators: number;
+    executives: number;
+  };
   pagination: {
     total: number;
     page: number;
@@ -45,6 +49,7 @@ const roleTones: Record<string, StatusTone> = {
 };
 
 function UsersPageContent() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const pageParam = searchParams.get("page") || "1";
   const currentPage = parseInt(pageParam);
@@ -60,7 +65,11 @@ function UsersPageContent() {
       try {
         setIsLoading(true);
         setError("");
-        const response = await fetch(`/api/users?page=${currentPage}&limit=10`);
+        const params = new URLSearchParams({ page: String(currentPage), limit: "10" });
+        if (query.trim()) params.set("q", query.trim());
+        if (role !== "Todos los roles") params.set("role", role);
+
+        const response = await fetch(`/api/users?${params.toString()}`);
 
         if (!response.ok) {
           throw new Error("Error al cargar usuarios");
@@ -76,26 +85,28 @@ function UsersPageContent() {
     };
 
     fetchUsers();
-  }, [currentPage]);
+  }, [currentPage, query, role]);
 
   const handlePageChange = (page: number) => {
     const params = new URLSearchParams();
     params.set("page", page.toString());
-    window.history.pushState(null, "", `?${params.toString()}`);
+    router.replace(`?${params.toString()}`);
   };
 
-  const filteredUsers = useMemo(
-    () =>
-      data?.users.filter((user) => {
-        const matchesQuery = `${user.firstName} ${user.lastName} ${user.email} ${user.rut}`.toLowerCase().includes(query.toLowerCase());
-        const matchesRole = role === "Todos los roles" || roleLabels[user.role] === role;
-        return matchesQuery && matchesRole;
-      }) ?? [],
-    [data, query, role],
-  );
+  const updateQuery = (value: string) => {
+    handlePageChange(1);
+    setQuery(value);
+  };
 
-  const admins = data?.users.filter((user) => user.role === "ADMINISTRADOR").length ?? 0;
-  const executives = data?.users.filter((user) => user.role === "EJECUTIVO").length ?? 0;
+  const updateRole = (value: string) => {
+    handlePageChange(1);
+    setRole(value);
+  };
+
+  const users = data?.users ?? [];
+
+  const admins = data?.summary.administrators ?? 0;
+  const executives = data?.summary.executives ?? 0;
 
   return (
     <div className="mx-auto w-full max-w-[1480px] px-1 py-2 sm:px-2 lg:px-4">
@@ -118,20 +129,13 @@ function UsersPageContent() {
             <MetricCard label="Ejecutivos" value={String(executives)} detail="En la página actual" trend="●" icon={UserCog} tone="green" />
           </section>
 
-          {data.users.length === 0 ? (
-            <EmptyState
-              title="Sin usuarios internos"
-              description="Aún no hay usuarios internos registrados en el sistema"
-              action={{ label: "Crear primer usuario", onClick: () => (window.location.href = "/app/usuarios/crear") }}
-            />
-          ) : (
-            <>
-              <FilterBar>
-                <SearchField value={query} onChange={setQuery} placeholder="Buscar por nombre, correo o RUT" label="Buscar usuarios" />
-                <FilterSelect label="Rol" value={role} onChange={setRole} options={["Todos los roles", "Ejecutivo", "Administrador"]} />
-              </FilterBar>
+          <>
+            <FilterBar>
+              <SearchField value={query} onChange={updateQuery} placeholder="Buscar por nombre, correo o RUT" label="Buscar usuarios" />
+              <FilterSelect label="Rol" value={role} onChange={updateRole} options={["Todos los roles", "Ejecutivo", "Administrador"]} />
+            </FilterBar>
 
-              <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-[0_10px_30px_rgba(7,30,65,0.05)]">
+            <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-[0_10px_30px_rgba(7,30,65,0.05)]">
                 <div className="overflow-x-auto">
                   <table className="w-full min-w-[760px] text-left">
                     <thead>
@@ -142,7 +146,7 @@ function UsersPageContent() {
                       </tr>
                     </thead>
                     <tbody>
-                      {filteredUsers.map((user, index) => (
+                      {users.map((user, index) => (
                         <motion.tr key={user.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: index * 0.04 }} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--background)]">
                           <td className="px-3 py-4">
                             <div className="flex items-center gap-3">
@@ -162,8 +166,9 @@ function UsersPageContent() {
                   </table>
                 </div>
 
+                {users.length === 0 && <EmptyState title="No encontramos usuarios" description="No hay usuarios que coincidan con los filtros aplicados." />}
                 <Pagination
-                  shown={filteredUsers.length}
+                  shown={users.length}
                   total={data.pagination.total}
                   itemLabel="usuarios"
                   page={data.pagination.page}
@@ -171,9 +176,8 @@ function UsersPageContent() {
                   pageSize={data.pagination.limit}
                   onPageChange={handlePageChange}
                 />
-              </section>
-            </>
-          )}
+            </section>
+          </>
         </motion.div>
       )}
     </div>

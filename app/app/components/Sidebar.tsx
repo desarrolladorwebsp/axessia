@@ -61,7 +61,7 @@ export default function Sidebar() {
       {/* Mobile Header */}
       <div className="md:hidden fixed top-0 left-0 right-0 z-50 bg-[var(--navy)] text-white border-b border-[var(--navy-dark)] px-4 py-3 flex items-center justify-between h-[92px]">
         <Image
-          src="/images/logo-axessia.png"
+          src="/images/logo-axessia-white.png"
           alt="Logo AXESSIA"
           width={100}
           height={33}

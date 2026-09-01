@@ -11,11 +11,13 @@ type ExecutiveOption = { id: string; firstName: string; lastName: string; role: 
 
 export type ManageStatusResult = {
   status: string;
+  updatedAt?: string;
   assignedExecutive?: { id: string; firstName: string; lastName: string } | null;
+  generatedMandate?: { fileName: string; sentAt: string | null } | null;
   note?: { id: string; executiveName: string; message: string; createdAt: string };
 };
 
-type Step = "choose" | "assign-select" | "assign-confirm" | "reject" | "shipping-confirm" | "complete-confirm";
+type Step = "choose" | "assign-select" | "assign-confirm" | "reject" | "mandate-confirm" | "shipping-confirm" | "complete-confirm";
 type Stage = "idle" | "submitting" | "success" | "error";
 
 const manageableRoles = ["EJECUTIVO", "ADMINISTRADOR"];
@@ -116,7 +118,7 @@ export default function ManageStatusModal({
     }
   };
 
-  const confirmTransition = async (action: "START_SHIPPING" | "COMPLETE") => {
+  const confirmTransition = async (action: "SEND_MANDATE" | "START_SHIPPING" | "COMPLETE") => {
     if (isBusy) return;
     try {
       setStage("submitting");
@@ -144,6 +146,8 @@ export default function ManageStatusModal({
           ? "Despacho iniciado"
           : step === "complete-confirm"
             ? "Solicitud finalizada"
+              : step === "mandate-confirm"
+                ? "Mandato enviado"
         : "Gestión confirmada"
       : step === "reject"
         ? "Rechazar solicitud"
@@ -153,6 +157,8 @@ export default function ManageStatusModal({
             ? "Asignar ejecutivo responsable"
             : step === "shipping-confirm"
               ? "Iniciar despacho"
+              : step === "mandate-confirm"
+                ? "Enviar poder"
               : step === "complete-confirm"
                 ? "Finalizar solicitud"
             : "Gestionar estado";
@@ -190,6 +196,11 @@ export default function ManageStatusModal({
             <SecondaryButton size="sm" onClick={() => setStep("choose")} disabled={isBusy}>Cancelar</SecondaryButton>
             <PrimaryButton size="sm" onClick={() => confirmTransition("START_SHIPPING")} disabled={isBusy} icon={isBusy ? Loader2 : undefined} className={isBusy ? "[&_svg]:animate-spin" : ""}>{isBusy ? "Actualizando..." : "Confirmar despacho"}</PrimaryButton>
           </div>
+        ) : step === "mandate-confirm" ? (
+          <div className="flex justify-end gap-2">
+            <SecondaryButton size="sm" onClick={() => setStep("choose")} disabled={isBusy}>Cancelar</SecondaryButton>
+            <PrimaryButton size="sm" onClick={() => confirmTransition("SEND_MANDATE")} disabled={isBusy} icon={isBusy ? Loader2 : undefined} className={isBusy ? "[&_svg]:animate-spin" : ""}>{isBusy ? "Enviando..." : "Generar y enviar mandato"}</PrimaryButton>
+          </div>
         ) : step === "complete-confirm" ? (
           <div className="flex justify-end gap-2">
             <SecondaryButton size="sm" onClick={() => setStep("choose")} disabled={isBusy}>Cancelar</SecondaryButton>
@@ -209,7 +220,7 @@ export default function ManageStatusModal({
         <div className="flex flex-col items-center gap-3 py-6 text-center">
           <CheckCircle2 className="h-6 w-6 text-emerald-600" />
           <p className="text-sm font-semibold text-[var(--navy)]">
-            {step === "reject" ? "La solicitud fue marcada como rechazada." : step === "shipping-confirm" ? "La solicitud pasó a En despacho." : step === "complete-confirm" ? "La solicitud fue marcada como finalizada." : "El ejecutivo fue asignado y la solicitud pasó a En gestión."}
+            {step === "reject" ? "La solicitud fue marcada como rechazada." : step === "mandate-confirm" ? "El mandato fue generado y enviado al cliente." : step === "shipping-confirm" ? "La solicitud pasó a En despacho." : step === "complete-confirm" ? "La solicitud fue marcada como finalizada." : "El ejecutivo fue asignado y la solicitud pasó a En gestión."}
           </p>
         </div>
       ) : step === "choose" ? (
@@ -232,6 +243,14 @@ export default function ManageStatusModal({
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-[var(--blue)]"><UserCog className="h-4 w-4" /></div>
             <div><p className="text-sm font-bold text-[var(--navy)]">Iniciar despacho</p><p className="mt-1 text-xs text-[var(--text-secondary)]">Confirma que el medicamento entra en proceso de despacho o envío.</p></div>
+          </button>}
+          {currentStatus === "ACCEPTED" && <button
+            type="button"
+            onClick={() => setStep("mandate-confirm")}
+            className="flex w-full items-start gap-3 rounded-xl border border-[var(--border)] p-4 text-left transition hover:border-[var(--blue)] hover:bg-[var(--background)]"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-[var(--blue)]"><UserCog className="h-4 w-4" /></div>
+            <div><p className="text-sm font-bold text-[var(--navy)]">Enviar poder</p><p className="mt-1 text-xs text-[var(--text-secondary)]">Genera el mandato y lo envía al correo registrado del cliente.</p></div>
           </button>}
           {currentStatus === "SHIPPING" && <button
             type="button"
@@ -280,6 +299,8 @@ export default function ManageStatusModal({
             </div>
           )}
         </motion.div>
+      ) : step === "mandate-confirm" ? (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4"><p className="text-sm text-[var(--text-secondary)]">¿Confirmas que deseas generar y enviar el mandato al cliente? El PDF se adjuntará al correo registrado.</p>{stage === "error" && <p className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-700">{error}</p>}</motion.div>
       ) : step === "assign-confirm" ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
           <div className="flex items-center gap-3 rounded-xl border border-[var(--border)] bg-[var(--background)] p-4">

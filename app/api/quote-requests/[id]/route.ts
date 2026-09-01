@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readDevQuoteRequests, readDevQuotes, shouldUseJsonStorage, writeDevQuoteRequests } from "@/lib/dev-request-store";
+import { getInternalActor } from "@/lib/internal-access";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -8,6 +9,7 @@ type RouteContext = {
 
 export async function GET(_request: NextRequest, { params }: RouteContext) {
   const { id } = await params;
+  if (!await getInternalActor()) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
 
   try {
     if (shouldUseJsonStorage()) {
@@ -68,6 +70,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
 
 export async function POST(request: NextRequest, { params }: RouteContext) {
   const { id } = await params;
+  if (!await getInternalActor()) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
 
   try {
     const body = (await request.json()) as { message?: unknown };
@@ -102,6 +105,7 @@ type UpdatePayload = {
 
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const { id } = await params;
+  if (!await getInternalActor()) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   const payload = (await request.json()) as UpdatePayload;
   const customer = payload.customer;
   const patient = payload.patient;

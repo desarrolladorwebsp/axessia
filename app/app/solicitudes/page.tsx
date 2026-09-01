@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { ChevronDown, FileCheck2, MoreVertical, Plus } from "lucide-react";
@@ -11,8 +11,9 @@ import MetricCard from "../components/MetricCard";
 import { PrimaryButton } from "../components/Buttons";
 import StatusBadge, { type StatusTone } from "../components/StatusBadge";
 import Avatar from "../components/Avatar";
-import { FilterBar, SearchField, FilterSelect, FilterButton } from "../components/FilterBar";
+import { FilterBar, SearchField, FilterSelect } from "../components/FilterBar";
 import Pagination from "../components/Pagination";
+import CreateRequestModal from "./CreateRequestModal";
 
 interface QuoteRequestItem {
   id: string;
@@ -23,11 +24,26 @@ interface QuoteRequestItem {
   requesterName?: string | null;
   requesterEmail?: string | null;
   customer: { name: string; email: string; phone: string } | null;
+  assignedExecutive: { id: string; firstName: string; lastName: string } | null;
   medications: Array<{ commercialName: string; activeIngredient: string }>;
 }
 
 interface PaginationData {
   quotes: QuoteRequestItem[];
+  summary?: {
+    totalRequests: number;
+    received: number;
+    inManagement: number;
+    quoted: number;
+    pendingDecision: number;
+    accepted: number;
+    shipping: number;
+    rejected: number;
+    cancelled: number;
+    completed: number;
+    dueSoon: number;
+    averageAgeDays: number;
+  };
   pagination: { total: number; page: number; limit: number; pages: number };
 }
 
@@ -39,15 +55,26 @@ export default function SolicitudesPage() {
   const [data, setData] = useState<PaginationData | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
+  const [page, setPage] = useState(1);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("Todos");
+  const [executive, setExecutive] = useState("Todos");
+  const [showCreateRequest, setShowCreateRequest] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
     const fetchSolicitudes = async () => {
       try {
         setIsLoading(true);
         setError("");
-        const response = await fetch("/api/quote-requests?page=1&limit=10");
+        const params = new URLSearchParams({ page: String(page), limit: "10" });
+        if (query.trim()) params.set("q", query.trim());
+        if (status !== "Todos") {
+          const statusValue = Object.entries(statusLabels).find(([, label]) => label === status)?.[0];
+          if (statusValue) params.set("status", statusValue);
+        }
+        if (executive === "Sin asignar") params.set("executive", "unassigned");
+        const response = await fetch(`/api/quote-requests?${params.toString()}`);
         if (!response.ok) throw new Error("Error al cargar solicitudes");
         setData((await response.json()) as PaginationData);
       } catch (err) {
@@ -57,24 +84,42 @@ export default function SolicitudesPage() {
       }
     };
     fetchSolicitudes();
-  }, []);
+  }, [page, query, status, executive, refreshKey]);
 
-  const filteredQuotes = useMemo(
-    () =>
-      data?.quotes.filter((request) => {
-        const name = request.customer?.name || request.requesterName || "";
-        const email = request.customer?.email || request.requesterEmail || "";
-        return (
-          `${name} ${email} ${request.requestNumber || ""}`.toLowerCase().includes(query.toLowerCase()) &&
-          (status === "Todos" || statusLabels[request.status] === status)
-        );
-      }) ?? [],
-    [data, query, status],
-  );
+  const updateQuery = (value: string) => {
+    setPage(1);
+    setQuery(value);
+  };
 
-  const received = data?.quotes.length ?? 0;
-  const inManagement = data?.quotes.filter((request) => ["RECEIVED", "SOURCING"].includes(request.status)).length ?? 0;
-  const quoted = data?.quotes.filter((request) => ["QUOTED", "AWAITING_DECISION"].includes(request.status)).length ?? 0;
+  const updateStatus = (value: string) => {
+    setPage(1);
+    setStatus(value);
+  };
+
+  const updateExecutive = (value: string) => {
+    setPage(1);
+    setExecutive(value);
+  };
+
+  const summary = data?.summary ?? {
+    totalRequests: 0,
+    received: 0,
+    inManagement: 0,
+    quoted: 0,
+    pendingDecision: 0,
+    accepted: 0,
+    shipping: 0,
+    rejected: 0,
+    cancelled: 0,
+    completed: 0,
+    dueSoon: 0,
+    averageAgeDays: 0,
+  };
+  const received = summary.totalRequests;
+  const inManagement = summary.inManagement;
+  const quoted = summary.quoted;
+  const dueSoon = summary.dueSoon;
+  const averageAgeDays = summary.averageAgeDays;
 
   return (
     <div className="mx-auto w-full max-w-[1480px] px-1 py-2 sm:px-2 lg:px-4">
@@ -83,7 +128,7 @@ export default function SolicitudesPage() {
         eyebrow="Gestión operativa"
         title="Solicitudes recibidas"
         description="Solicitudes recibidas desde la web y en proceso de gestión"
-        actions={<PrimaryButton href="/" icon={Plus}>Nueva solicitud</PrimaryButton>}
+        actions={<PrimaryButton onClick={() => setShowCreateRequest(true)} icon={Plus}>Nueva solicitud</PrimaryButton>}
       />
 
       {isLoading && <SkeletonTable rows={6} />}
@@ -92,19 +137,17 @@ export default function SolicitudesPage() {
       {!isLoading && data && (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-5">
           <section className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-            <MetricCard label="Total solicitudes" value={String(received)} detail="100% del total" trend="+12%" icon={FileCheck2} tone="violet" />
-            <MetricCard label="En gestión" value={String(inManagement)} detail={`${received ? Math.round((inManagement / received) * 100) : 0}% del total`} trend="+8%" icon={FileCheck2} tone="blue" />
-            <MetricCard label="Cotizadas" value={String(quoted)} detail={`${received ? Math.round((quoted / received) * 100) : 0}% del total`} trend="+5%" icon={FileCheck2} tone="green" />
-            <MetricCard label="Próximas a vencer" value="1" detail="Requiere atención" trend="▲" icon={FileCheck2} tone="yellow" />
-            <MetricCard label="Tiempo promedio" value="2.4" detail="días desde recepción" trend="-4%" icon={FileCheck2} tone="neutral" />
+            <MetricCard label="Total solicitudes" value={String(received)} detail="100% del total" trend="0%" icon={FileCheck2} tone="violet" />
+            <MetricCard label="En gestión" value={String(inManagement)} detail={`${received ? Math.round((inManagement / received) * 100) : 0}% del total`} trend="0%" icon={FileCheck2} tone="blue" />
+            <MetricCard label="Cotizadas" value={String(quoted)} detail={`${received ? Math.round((quoted / received) * 100) : 0}% del total`} trend="0%" icon={FileCheck2} tone="green" />
+            <MetricCard label="Próximas a vencer" value={String(dueSoon)} detail={dueSoon ? "Requiere atención" : "Sin vencimientos"} trend="0%" icon={FileCheck2} tone="yellow" />
+            <MetricCard label="Tiempo promedio" value={String(averageAgeDays)} detail="días desde recepción" trend="0%" icon={FileCheck2} tone="neutral" />
           </section>
 
           <FilterBar>
-            <SearchField value={query} onChange={setQuery} placeholder="Buscar por cliente, ID de solicitud o producto..." label="Buscar solicitudes" />
-            <FilterSelect label="Estado" value={status} onChange={setStatus} options={["Todos", ...Object.values(statusLabels)]} />
-            <FilterSelect label="Origen" value="Todos" onChange={() => undefined} options={["Todos", "Web", "Referido"]} />
-            <FilterSelect label="Ejecutivo asignado" value="Todos" onChange={() => undefined} options={["Todos", "Sin asignar"]} />
-            <FilterButton>Filtros avanzados</FilterButton>
+            <SearchField value={query} onChange={updateQuery} placeholder="Buscar por cliente, ID de solicitud o producto..." label="Buscar solicitudes" />
+            <FilterSelect label="Estado" value={status} onChange={updateStatus} options={["Todos", ...Object.values(statusLabels)]} />
+            <FilterSelect label="Ejecutivo asignado" value={executive} onChange={updateExecutive} options={["Todos", "Sin asignar"]} />
           </FilterBar>
 
           <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-[0_10px_30px_rgba(7,30,65,0.05)]">
@@ -121,21 +164,23 @@ export default function SolicitudesPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredQuotes.map((request, index) => (
+                  {(data?.quotes ?? []).map((request, index) => (
                     <RequestRow key={request.id} request={request} index={index} onOpen={() => router.push(`/app/solicitudes/${request.id}`)} />
                   ))}
                 </tbody>
               </table>
             </div>
             <div className="divide-y divide-[var(--border)] md:hidden">
-              {filteredQuotes.map((request, index) => (
+              {(data?.quotes ?? []).map((request, index) => (
                 <MobileRequestCard key={request.id} request={request} index={index} onOpen={() => router.push(`/app/solicitudes/${request.id}`)} />
               ))}
             </div>
-            <Pagination shown={filteredQuotes.length} total={data.pagination.total} itemLabel="solicitudes" page={data.pagination.page} pages={data.pagination.pages} pageSize={data.pagination.limit} />
+            {data.quotes.length === 0 && <div className="p-12 text-center text-sm text-[var(--text-secondary)]">No encontramos solicitudes con esos filtros.</div>}
+            <Pagination shown={data?.quotes.length ?? 0} total={data.pagination.total} itemLabel="solicitudes" page={data.pagination.page} pages={data.pagination.pages} pageSize={data.pagination.limit} onPageChange={setPage} />
           </section>
         </motion.div>
       )}
+      <CreateRequestModal open={showCreateRequest} onClose={() => setShowCreateRequest(false)} onCreated={() => { setPage(1); setRefreshKey((current) => current + 1); }} />
     </div>
   );
 }
@@ -166,10 +211,12 @@ function RequestRow({ request, index, onOpen }: { request: QuoteRequestItem; ind
       </td>
       <td className="px-3 py-4"><StatusBadge label={statusLabels[request.status] || request.status} tone={statusTones[request.status]} /></td>
       <td className="px-3 py-4">
-        <div className="flex items-center gap-2">
-          <Avatar name="Ejecutivo AX" size="sm" />
-          <span className="text-[10px] font-semibold text-[var(--text-secondary)]">Sin asignar</span>
-        </div>
+        {request.assignedExecutive ? (
+          <div className="flex items-center gap-2">
+            <Avatar name={`${request.assignedExecutive.firstName} ${request.assignedExecutive.lastName}`} size="sm" />
+            <span className="text-[10px] font-semibold text-[var(--text-secondary)]">{request.assignedExecutive.firstName} {request.assignedExecutive.lastName}</span>
+          </div>
+        ) : <span className="text-[10px] font-semibold text-[var(--text-secondary)]">Sin asignar</span>}
       </td>
       <td className="px-3 py-4">
         <button onClick={(event) => event.stopPropagation()} className="icon-button-small" aria-label={`Acciones para ${name}`} title="Acciones">

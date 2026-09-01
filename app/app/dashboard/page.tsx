@@ -17,6 +17,18 @@ interface QuoteRequestSummary {
 
 interface DashboardData {
   quotes: QuoteRequestSummary[];
+  summary?: {
+    totalRequests: number;
+    received: number;
+    inManagement: number;
+    quoted: number;
+    pendingDecision: number;
+    accepted: number;
+    shipping: number;
+    rejected: number;
+    cancelled: number;
+    completed: number;
+  };
   pagination: {
     total: number;
     page: number;
@@ -42,7 +54,20 @@ export default function DashboardPage() {
           throw new Error("No fue posible cargar las solicitudes del dashboard");
         }
 
-        const result = (await response.json()) as DashboardData;
+        const result = (await response.json()) as DashboardData & {
+          summary?: {
+            totalRequests: number;
+            received: number;
+            inManagement: number;
+            quoted: number;
+            pendingDecision: number;
+            accepted: number;
+            shipping: number;
+            rejected: number;
+            cancelled: number;
+            completed: number;
+          };
+        };
         setData(result);
       } catch (err) {
         setError(
@@ -56,8 +81,20 @@ export default function DashboardPage() {
     fetchDashboardData();
   }, []);
 
-  const inManagement = data ? data.quotes.filter((request) => ["RECEIVED", "SOURCING"].includes(request.status)).length : 0;
-  const quoted = data ? data.quotes.filter((request) => request.status === "QUOTED").length : 0;
+  const summary = data?.summary ?? {
+    totalRequests: 0,
+    received: 0,
+    inManagement: 0,
+    quoted: 0,
+    pendingDecision: 0,
+    accepted: 0,
+    shipping: 0,
+    rejected: 0,
+    cancelled: 0,
+    completed: 0,
+  };
+  const inManagement = summary.inManagement;
+  const quoted = summary.quoted;
 
   const container = {
     hidden: { opacity: 0 },
@@ -93,9 +130,9 @@ export default function DashboardPage() {
       ) : (
         <motion.div variants={container} initial="hidden" animate="visible" className="space-y-5">
           <motion.section variants={item} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <MetricCard label="Solicitudes" value={data ? String(data.pagination.total) : "0"} detail="Solicitudes recibidas" trend="+12%" icon={FileCheck2} tone="violet" />
-            <MetricCard label="En gestión" value={String(inManagement)} detail="Pendientes por gestionar" trend="+6%" icon={ClipboardList} tone="yellow" />
-            <MetricCard label="Cotizadas" value={String(quoted)} detail="Solicitudes con cotización" trend="+9%" icon={ReceiptText} tone="green" />
+            <MetricCard label="Solicitudes" value={String(summary.totalRequests)} detail="Solicitudes recibidas" trend="0%" icon={FileCheck2} tone="violet" />
+            <MetricCard label="En gestión" value={String(inManagement)} detail="Pendientes por gestionar" trend="0%" icon={ClipboardList} tone="yellow" />
+            <MetricCard label="Cotizadas" value={String(quoted)} detail="Solicitudes con cotización" trend="0%" icon={ReceiptText} tone="green" />
           </motion.section>
 
           <motion.div variants={item} className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -104,9 +141,9 @@ export default function DashboardPage() {
               <div className="mt-4 space-y-3">
                 {data ? (
                   [
-                    { label: "Recibidas", total: data.quotes.filter((request) => request.status === "RECEIVED").length },
-                    { label: "En gestión", total: data.quotes.filter((request) => request.status === "SOURCING").length },
-                    { label: "Cotizadas", total: data.quotes.filter((request) => request.status === "QUOTED").length },
+                    { label: "Recibidas", total: summary.received },
+                    { label: "En gestión", total: summary.inManagement },
+                    { label: "Cotizadas", total: summary.quoted },
                   ].map((status) => (
                     <div key={status.label} className="flex items-center justify-between rounded-xl border border-[var(--border)] bg-[var(--background)] px-4 py-3">
                       <span className="text-xs font-bold text-[var(--navy)]">{status.label}</span>
@@ -139,14 +176,6 @@ export default function DashboardPage() {
             </div>
           </motion.div>
 
-          <motion.div variants={item} className="rounded-2xl border border-[var(--border)] bg-gradient-to-r from-[var(--cyan)]/5 to-[var(--blue)]/5 p-6">
-            <h3 className="font-display text-lg font-extrabold text-[var(--navy)]">Seguimiento de solicitudes</h3>
-            <p className="mt-2 text-sm text-[var(--text-secondary)]">
-              {error
-                ? `No se pudieron cargar las solicitudes: ${error}`
-                : "El panel refleja en tiempo real las solicitudes registradas desde la web y su estado actual."}
-            </p>
-          </motion.div>
         </motion.div>
       )}
     </div>

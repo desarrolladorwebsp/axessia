@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readDevQuoteRequests, readDevQuotes, writeDevQuoteRequests, writeDevQuotes, shouldUseJsonStorage } from "@/lib/dev-request-store";
 import { parseQuoteItems, computeQuoteTotal, parseValidUntil, type QuoteItemPayload } from "@/lib/quote-items";
+import { getInternalActor } from "@/lib/internal-access";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -18,6 +19,7 @@ const editableStatuses = ["DRAFT", "READY"];
 
 export async function PATCH(request: NextRequest, { params }: RouteContext) {
   const { id } = await params;
+  if (!await getInternalActor()) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
 
   try {
     const payload = (await request.json()) as QuotePayload;

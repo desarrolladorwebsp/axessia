@@ -15,13 +15,14 @@ export async function POST(request: NextRequest) {
   const action = body.action === "accept" || body.action === "reject" || body.action === "comment" ? body.action : null;
   const comment = typeof body.comment === "string" ? body.comment.trim().slice(0, 2000) : "";
   if (!requestNumber || !action) return NextResponse.json({ error: "La acción no es válida." }, { status: 400 });
+  if ((action === "reject" || action === "comment") && !comment) return NextResponse.json({ error: action === "reject" ? "El motivo de rechazo es obligatorio." : "Escribe un comentario antes de enviarlo." }, { status: 400 });
 
   if (shouldUseJsonStorage()) {
     const records = await readDevQuoteRequests();
     const index = records.findIndex((item) => item.requestNumber === requestNumber);
     if (index < 0) return NextResponse.json({ error: "La sesión de seguimiento no es válida." }, { status: 401 });
     const record = records[index];
-    if (record.status !== "AWAITING_DECISION" || !comment) return NextResponse.json({ error: "Esta cotización ya no está disponible para esta acción." }, { status: 409 });
+    if (record.status !== "AWAITING_DECISION") return NextResponse.json({ error: "Esta cotización ya no está disponible para esta acción." }, { status: 409 });
     const updatedAt = new Date().toISOString();
     const nextStatus = action === "comment" ? record.status : action === "accept" ? "ACCEPTED" : "REJECTED";
     records[index] = {

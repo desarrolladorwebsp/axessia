@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readDevQuoteRequests, shouldUseJsonStorage, writeDevQuoteRequests } from "@/lib/dev-request-store";
+import { getInternalActor } from "@/lib/internal-access";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function POST(request: NextRequest, { params }: RouteContext) {
   const { id } = await params;
+  if (!await getInternalActor()) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   const body = (await request.json()) as { fileName?: unknown; mimeType?: unknown; fileSize?: unknown };
   const fileName = typeof body.fileName === "string" ? body.fileName.trim() : "";
   const mimeType = typeof body.mimeType === "string" ? body.mimeType.trim() : "";

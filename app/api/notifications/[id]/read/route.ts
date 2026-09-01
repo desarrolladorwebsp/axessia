@@ -1,11 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { markDevNotificationAsRead, shouldUseJsonStorage } from "@/lib/dev-request-store";
+import { getInternalActor } from "@/lib/internal-access";
 
 type RouteContext = { params: Promise<{ id: string }> };
 
 export async function POST(_request: Request, { params }: RouteContext) {
   const { id } = await params;
+  if (!await getInternalActor()) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
 
   try {
     if (shouldUseJsonStorage()) {

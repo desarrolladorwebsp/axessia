@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readDevQuoteRequests, readDevQuotes, writeDevQuoteRequests, writeDevQuotes, shouldUseJsonStorage } from "@/lib/dev-request-store";
 import { sendQuoteReadyEmail } from "@/lib/services/email";
+import { getInternalActor } from "@/lib/internal-access";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -11,6 +12,7 @@ type RouteContext = {
 // can be reported back and retried without recreating the quote.
 export async function POST(_request: NextRequest, { params }: RouteContext) {
   const { id } = await params;
+  if (!await getInternalActor()) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
 
   try {
     if (shouldUseJsonStorage()) {
@@ -48,6 +50,7 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
       include: { customer: { select: { email: true, name: true } }, request: { select: { id: true, requestNumber: true, status: true } } },
     });
     if (!quote) return NextResponse.json({ error: "Cotización no encontrada" }, { status: 404 });
+    if (quote.status !== "READY" || quote.request.status !== "QUOTED") return NextResponse.json({ error: "La cotización no está disponible para envío" }, { status: 409 });
 
     try {
       await sendQuoteReadyEmail(
@@ -65,10 +68,8 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
 
     const updated = await prisma.$transaction(async (transaction) => {
       const sent = await transaction.quote.update({ where: { id }, data: { status: "SENT", sentAt: new Date() } });
-      if (quote.request.status !== "AWAITING_DECISION") {
-        await transaction.quoteRequest.update({ where: { id: quote.request.id }, data: { status: "AWAITING_DECISION" } });
-        await transaction.quoteRequestEvent.create({ data: { requestId: quote.request.id, status: "AWAITING_DECISION", eventType: "QUOTE_SENT" } });
-      }
+      await transaction.quoteRequest.update({ where: { id: quote.request.id }, data: { status: "AWAITING_DECISION" } });
+      await transaction.quoteRequestEvent.create({ data: { requestId: quote.request.id, status: "AWAITING_DECISION", eventType: "QUOTE_SENT" } });
       return sent;
     });
     return NextResponse.json({

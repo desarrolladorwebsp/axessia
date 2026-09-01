@@ -1,7 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import { INTERNAL_SESSION_COOKIE, verifyInternalSessionToken } from "@/lib/auth";
+import { UserRole } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { matchesSearchValue, normalizeSearchValue } from "@/lib/search";
 
 export async function GET(request: NextRequest) {
   try {
@@ -23,13 +25,30 @@ export async function GET(request: NextRequest) {
     }
 
     const { searchParams } = new URL(request.url);
-    const page = parseInt(searchParams.get("page") || "1");
-    const limit = parseInt(searchParams.get("limit") || "10");
-
+    const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
+    const limit = Math.max(1, Math.min(Number.parseInt(searchParams.get("limit") || "10", 10), 50));
+    const rawQuery = searchParams.get("q") ?? "";
+    const roleFilter = searchParams.get("role") ?? "";
+    const normalizedQuery = normalizeSearchValue(rawQuery);
     const skip = (page - 1) * limit;
 
-    const [users, total] = await Promise.all([
+    const role = roleFilter === "Ejecutivo" ? UserRole.EJECUTIVO : roleFilter === "Administrador" ? UserRole.ADMINISTRADOR : undefined;
+    const where = {
+      ...(role ? { role } : {}),
+      ...(normalizedQuery
+        ? {
+            OR: [
+              { firstName: { contains: normalizedQuery } },
+              { lastName: { contains: normalizedQuery } },
+              { email: { contains: normalizedQuery } },
+              { rut: { contains: normalizedQuery } },
+            ],
+          }
+        : {}),
+    };
+    const [users, total, roleSummary] = await Promise.all([
       prisma.user.findMany({
+        where,
         select: {
           id: true,
           firstName: true,
@@ -43,11 +62,17 @@ export async function GET(request: NextRequest) {
         skip,
         take: limit,
       }),
-      prisma.user.count(),
+      prisma.user.count({ where }),
+      prisma.user.groupBy({ by: ["role"], _count: { _all: true }, where }),
     ]);
+    const roleCounts = Object.fromEntries(roleSummary.map((item) => [item.role, item._count._all]));
 
     return NextResponse.json({
       users,
+      summary: {
+        administrators: roleCounts.ADMINISTRADOR ?? 0,
+        executives: roleCounts.EJECUTIVO ?? 0,
+      },
       pagination: {
         total,
         page,

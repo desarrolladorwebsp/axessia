@@ -1,0 +1,101 @@
+Attached Element Context from Integrated Browser
+
+Element: a.flex.items-center.gap-3.rounded-xl.px-3.py-3.text-sm.font-semibold.transition-all.text-white/60.hover:bg-white/8.hover:text-white
+
+URL: http://localhost:3000/app/clientes
+
+HTML Path: div.app-system.flex.min-h-screen.bg-[var(--background)] > aside.fixed.inset-y-0.left-0.z-40.hidden.w-64.flex-col.bg-[var(--navy-dark)].text-white.md:flex > nav.flex-1.overflow-y-auto.px-4.py-6 > div > div.space-y-1 > div > a.flex.items-center.gap-3.rounded-xl.px-3.py-3.text-sm.font-semibold.transition-all.text-white/60.hover:bg-white/8.hover:text-white
+
+Outer HTML:
+```html
+<a class="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-semibold transition-all text-white/60 hover:bg-white/8 hover:text-white" href="/app/solicitudes"><svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-text h-[18px] w-[18px]" aria-hidden="true"><path d="M6 22a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h8a2.4 2.4 0 0 1 1.704.706l3.588 3.588A2.4 2.4 0 0 1 20 8v12a2 2 0 0 1-2 2z"></path><path d="M14 2v5a1 1 0 0 0 1 1h5"></path><path d="M10 9H8"></path><path d="M16 13H8"></path><path d="M16 17H8"></path></svg><span class="flex-1">Solicitudes</span></a>
+```
+
+Dimensions:
+- top: 216px
+- left: 20px
+- width: 224px
+- height: 44px
+
+CSS:
+```css
+*, :after, :before, ::backdrop { box-sizing: border-box;
+    border: 0 solid;
+    margin: 0;
+    padding: 0; }
+a { color: inherit;
+    -webkit-text-decoration: inherit;
+    -webkit-text-decoration: inherit;
+    text-decoration: inherit; }
+.flex { display: flex; }
+.items-center { align-items: center; }
+.gap-3 { gap: calc(var(--spacing) * 3); }
+.rounded-xl { border-radius: var(--radius-xl); }
+.px-3 { padding-inline: calc(var(--spacing) * 3); }
+.py-3 { padding-block: calc(var(--spacing) * 3); }
+.text-sm { font-size: var(--text-sm);
+    line-height: var(--tw-leading, var(--text-sm--line-height)); }
+.font-semibold { --tw-font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-semibold); }
+.text-white\/60 { color: var(--white); }
+.text-white\/60 { color: color-mix(in oklab, var(--white) 60%, transparent); }
+.transition-all { transition-property: all;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration)); }
+.hover\:bg-white:hover, .hover\:bg-white\/8:hover { background-color: var(--white); }
+.hover\:bg-white\/8:hover { background-color: color-mix(in oklab, var(--white) 8%, transparent); }
+
+/* Pseudo-elements */
+::selection { background: #087fd52e; }
+
+/* Inherited */
+.text-white { color: var(--white) }
+.app-system { font-family: var(--font-sans) }
+.text-\[var\(--text\)\] { color: var(--text) }
+body { color: var(--text); font-family: var(--font-sans), "Segoe UI", sans-serif }
+html, :host { tab-size: 4; line-height: 1.5; font-family: var(--default-font-family, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", "Noto Sans", Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"); font-feature-settings: var(--default-font-feature-settings, normal) }
+
+/* Resolved values */
+margin: 0px;
+padding: 12px;
+border: 0px solid rgb(255, 255, 255);
+text-decoration: rgb(255, 255, 255);
+align-items: center;
+background-attachment: scroll;
+background-clip: border-box;
+background-color: oklab(0.999994 0.0000455678 0.0000200868 / 0.08);
+background-image: none;
+background-origin: padding-box;
+background-position-x: 0%;
+background-position-y: 0%;
+background-repeat: repeat;
+background-size: auto;
+box-sizing: border-box;
+color: rgb(255, 255, 255);
+cursor: pointer /*UA*/;
+display: flex;
+font-family: "Plus Jakarta Sans", "Plus Jakarta Sans Fallback";
+font-feature-settings: normal;
+font-size: 14px;
+font-weight: 600;
+height: 44px;
+line-height: 20px;
+tab-size: 4;
+transition-duration: 0.15s;
+transition-property: all;
+transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+width: 224px;
+
+/* CSS variables */
+--default-transition-timing-function: cubic-bezier(.4, 0, .2, 1);
+--white: #fff;
+--spacing: .25rem;
+--font-weight-semibold: 600;
+--text-sm: .875rem;
+--font-sans: "Plus Jakarta Sans", "Plus Jakarta Sans Fallback";
+--text-sm--line-height: calc(1.25 / .875);
+--default-font-family: "Plus Jakarta Sans", "Plus Jakarta Sans Fallback";
+--text: #071e41;
+--default-transition-duration: .15s;
+--radius-xl: .75rem;
+```

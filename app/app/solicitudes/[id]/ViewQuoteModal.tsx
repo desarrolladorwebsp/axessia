@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AlertTriangle, Pencil, Send } from "lucide-react";
+import { AlertTriangle, Download, Pencil, Send } from "lucide-react";
 import Modal from "../../components/Modal";
 import { PrimaryButton, SecondaryButton } from "../../components/Buttons";
 import StatusBadge, { type StatusTone } from "../../components/StatusBadge";
@@ -67,7 +67,8 @@ export default function ViewQuoteModal({
 
   if (!quote) return null;
 
-  const canEditOrSend = editableStatuses.includes(quote.status);
+  const canEdit = editableStatuses.includes(quote.status);
+  const canSend = quote.status === "READY";
 
   const sendQuote = async () => {
     if (isSending) return;
@@ -100,14 +101,17 @@ export default function ViewQuoteModal({
           <div className="flex flex-wrap items-center gap-2">
             {sendError && <p className="text-xs font-semibold text-rose-600">{sendError}</p>}
             <p className="text-sm font-extrabold text-[var(--navy)]">Total: {money(quote.total)}</p>
-            {canEditOrSend && (
+            {canEdit && (
               <>
                 <SecondaryButton size="sm" icon={Pencil} onClick={() => onEdit(quote)} disabled={isSending}>Editar</SecondaryButton>
+                {canSend && (
                 <PrimaryButton size="sm" icon={Send} onClick={sendQuote} disabled={isSending}>
                   {isSending ? "Enviando..." : "Enviar al cliente"}
                 </PrimaryButton>
+                )}
               </>
             )}
+            <a href={`/api/quotes/${quote.id}/pdf`} target="_blank" rel="noreferrer" className="icon-button-small" aria-label="Descargar cotización en PDF" title="Descargar cotización en PDF"><Download className="h-3.5 w-3.5" /></a>
           </div>
         </div>
       }
