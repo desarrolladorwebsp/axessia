@@ -32,7 +32,7 @@ const information = [
 
 const partners = [
   { src: "/images/footer/logo-banchile_pagos.svg", alt: "Banco de Chile" },
-  { src: "/images/footer/logo-camara-de-comercio-santiago.jpeg", alt: "Cámara de Comercio de Santiago" },
+  { src: "/images/footer/logo-camara-de-comercio-santiago.jpeg", alt: "Cámara de Comercio de Santiago." },
   { src: "/images/footer/logo-dhl.png", alt: "DHL" },
 ];
 
