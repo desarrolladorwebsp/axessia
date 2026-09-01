@@ -6,6 +6,17 @@ import { isValidRut, normalizeEmail, normalizeRut } from "@/lib/customer-validat
 import { prisma } from "@/lib/prisma";
 import { sendEmailAwaited } from "@/lib/services/email";
 
+function getBaseUrl(): string {
+  const configured = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? process.env.VERCEL_URL ?? process.env.NEXT_PUBLIC_VERCEL_URL ?? process.env.VERCEL_PROJECT_PRODUCTION_URL;
+
+  if (configured) {
+    const normalized = configured.startsWith("http") ? configured : `https://${configured}`;
+    return normalized.replace(/\/$/, "");
+  }
+
+  return "https://axessia.vercel.app";
+}
+
 function buildInvitationEmail({ fullName, invitationUrl }: { fullName: string; invitationUrl: string }) {
   const brandName = "AXESSIA";
 
@@ -104,8 +115,8 @@ export async function POST(request: Request) {
 
     const token = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
-    const baseUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://axessia.vercel.app";
-    const invitationUrl = `${baseUrl.replace(/\/$/, "")}/invitacion/${token}`;
+    const baseUrl = getBaseUrl();
+    const invitationUrl = `${baseUrl}/invitacion/${token}`;
 
     const invitation = await prisma.internalUserInvitation.create({
       data: {

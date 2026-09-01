@@ -17,27 +17,37 @@ function InvalidInvitationView({ message }: { message: string }) {
 }
 
 export default async function InvitationPage({ params }: { params: Promise<{ token: string }> }) {
-  const { token } = await params;
-  const invitation = await prisma.internalUserInvitation.findUnique({
-    where: { token },
-    select: { id: true, email: true, rut: true, role: true, status: true, expiresAt: true },
-  });
+  try {
+    const { token } = await params;
 
-  if (!invitation) {
-    return <InvalidInvitationView message="La invitación no existe, fue eliminada o no es válida." />;
-  }
+    if (!process.env.DATABASE_URL) {
+      return <InvalidInvitationView message="La configuración de la base de datos de producción no está disponible en este entorno. Revisa DATABASE_URL y vuelve a intentarlo." />;
+    }
 
-  if (invitation.status !== "PENDING") {
-    return <InvalidInvitationView message="Esta invitación ya fue utilizada o ya no está activa." />;
-  }
-
-  if (new Date(invitation.expiresAt).getTime() < Date.now()) {
-    await prisma.internalUserInvitation.update({
-      where: { id: invitation.id },
-      data: { status: "EXPIRED" },
+    const invitation = await prisma.internalUserInvitation.findUnique({
+      where: { token },
+      select: { id: true, email: true, rut: true, role: true, status: true, expiresAt: true },
     });
-    return <InvalidInvitationView message="La invitación ha vencido y ya no puede usarse." />;
-  }
 
-  return <InvitationRegistrationForm token={token} invitation={{ email: normalizeEmail(invitation.email), rut: normalizeRut(invitation.rut), role: invitation.role }} />;
+    if (!invitation) {
+      return <InvalidInvitationView message="La invitación no existe, fue eliminada o no es válida." />;
+    }
+
+    if (invitation.status !== "PENDING") {
+      return <InvalidInvitationView message="Esta invitación ya fue utilizada o ya no está activa." />;
+    }
+
+    if (new Date(invitation.expiresAt).getTime() < Date.now()) {
+      await prisma.internalUserInvitation.update({
+        where: { id: invitation.id },
+        data: { status: "EXPIRED" },
+      });
+      return <InvalidInvitationView message="La invitación ha vencido y ya no puede usarse." />;
+    }
+
+    return <InvitationRegistrationForm token={token} invitation={{ email: normalizeEmail(invitation.email), rut: normalizeRut(invitation.rut), role: invitation.role }} />;
+  } catch (error) {
+    console.error("Invitation page failed to load:", error);
+    return <InvalidInvitationView message="La invitación no pudo validarse en este momento porque la base de datos no está disponible. Revisa la conexión de producción y vuelve a intentarlo." />;
+  }
 }
