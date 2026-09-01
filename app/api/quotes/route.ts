@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
     const quote = await prisma.$transaction(async (transaction) => {
       const source = await transaction.quoteRequest.findUnique({ where: { id: requestId }, select: { id: true, status: true, customerId: true, requesterName: true, requesterPhone: true, requesterEmail: true, requesterRut: true, requesterCity: true } });
       if (!source) throw new Error("Solicitud no encontrada");
-      if (!["SOURCING", "QUOTED"].includes(source.status)) throw new Error("La solicitud no está disponible para crear una cotización");
+      if (!["RECEIVED", "SOURCING", "QUOTED", "AWAITING_DECISION"].includes(source.status)) throw new Error("La solicitud no está disponible para crear una cotización");
       let customerId = source.customerId;
       if (!customerId) {
         const existingCustomer = await transaction.customer.findFirst({ where: { OR: [{ email: source.requesterEmail }, { rut: source.requesterRut }] }, select: { id: true } });

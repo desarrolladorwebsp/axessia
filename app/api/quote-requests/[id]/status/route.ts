@@ -37,35 +37,52 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       const executive = await prisma.user.findUnique({ where: { id: executiveId }, select: { id: true, firstName: true, lastName: true, role: true } });
       if (!executive || !manageableRoles.includes(executive.role)) return invalid("El ejecutivo seleccionado no es válido");
 
+      const now = new Date();
+
       if (shouldUseJsonStorage()) {
         const records = await readDevQuoteRequests();
         const index = records.findIndex((record) => record.id === id);
         if (index === -1) return invalid("Solicitud no encontrada", 404);
-        if (records[index].status !== "RECEIVED") return invalid("La solicitud ya no está disponible para esta acción", 409);
 
-        const now = new Date().toISOString();
+        const currentStatus = records[index].status;
+        const nextStatus = currentStatus === "RECEIVED" ? "SOURCING" : currentStatus;
+        const assignmentEvent = {
+          id: `dev-event-${Date.now()}`,
+          status: nextStatus,
+          eventType: "EXECUTIVE_ASSIGNED",
+          note: `Ejecutivo asignado: ${executive.firstName} ${executive.lastName}`,
+          createdAt: now.toISOString(),
+        };
+
         records[index] = {
           ...records[index],
-          status: "SOURCING",
-          updatedAt: now,
+          status: nextStatus,
+          updatedAt: now.toISOString(),
           assignedExecutive: { id: executive.id, firstName: executive.firstName, lastName: executive.lastName },
+          events: [assignmentEvent, ...(records[index].events ?? [])],
         };
         await writeDevQuoteRequests(records);
-        return NextResponse.json({ status: records[index].status, assignedExecutive: records[index].assignedExecutive, updatedAt: now });
+        return NextResponse.json({ status: records[index].status, assignedExecutive: records[index].assignedExecutive, updatedAt: now.toISOString(), note: assignmentEvent });
       }
 
       const existing = await prisma.quoteRequest.findUnique({ where: { id }, select: { status: true } });
       if (!existing) return invalid("Solicitud no encontrada", 404);
-      if (existing.status !== "RECEIVED") return invalid("La solicitud ya no está disponible para esta acción", 409);
 
+      const nextStatus = existing.status === "RECEIVED" ? "SOURCING" : existing.status;
       const updated = await prisma.$transaction(async (transaction) => {
         const updatedRequest = await transaction.quoteRequest.update({
           where: { id },
-          data: { status: "SOURCING", assignedExecutiveId: executive.id },
+          data: { status: nextStatus, assignedExecutiveId: executive.id },
           select: { status: true, updatedAt: true, assignedExecutive: { select: { id: true, firstName: true, lastName: true } } },
         });
         await transaction.quoteRequestEvent.create({
-          data: { requestId: id, status: "SOURCING", eventType: "MANAGEMENT_CONFIRMED", actorId: actor.id },
+          data: {
+            requestId: id,
+            status: nextStatus,
+            eventType: "EXECUTIVE_ASSIGNED",
+            actorId: actor.id,
+            note: `Ejecutivo asignado: ${executive.firstName} ${executive.lastName}`,
+          },
         });
         return updatedRequest;
       });

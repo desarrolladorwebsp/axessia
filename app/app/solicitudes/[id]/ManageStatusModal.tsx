@@ -220,20 +220,20 @@ export default function ManageStatusModal({
         <div className="flex flex-col items-center gap-3 py-6 text-center">
           <CheckCircle2 className="h-6 w-6 text-emerald-600" />
           <p className="text-sm font-semibold text-[var(--navy)]">
-            {step === "reject" ? "La solicitud fue marcada como rechazada." : step === "mandate-confirm" ? "El mandato fue generado y enviado al cliente." : step === "shipping-confirm" ? "La solicitud pasó a En despacho." : step === "complete-confirm" ? "La solicitud fue marcada como finalizada." : "El ejecutivo fue asignado y la solicitud pasó a En gestión."}
+            {step === "reject" ? "La solicitud fue marcada como rechazada." : step === "mandate-confirm" ? "El mandato fue generado y enviado al cliente." : step === "shipping-confirm" ? "La solicitud pasó a En despacho." : step === "complete-confirm" ? "La solicitud fue marcada como finalizada." : "El ejecutivo fue asignado y queda registrado en el historial de la solicitud."}
           </p>
         </div>
       ) : step === "choose" ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
-          {currentStatus === "RECEIVED" && <button
+          {!["REJECTED", "CANCELLED", "COMPLETED"].includes(currentStatus) && <button
             type="button"
             onClick={() => setStep("assign-select")}
             className="flex w-full items-start gap-3 rounded-xl border border-[var(--border)] p-4 text-left transition hover:border-[var(--blue)] hover:bg-[var(--background)]"
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-[var(--blue)]"><UserCog className="h-4 w-4" /></div>
             <div>
-              <p className="text-sm font-bold text-[var(--navy)]">Confirmar recepción / iniciar gestión</p>
-              <p className="mt-1 text-xs text-[var(--text-secondary)]">Asigna un ejecutivo responsable y mueve la solicitud a &quot;En gestión&quot;.</p>
+              <p className="text-sm font-bold text-[var(--navy)]">{currentStatus === "RECEIVED" ? "Asignar ejecutivo" : "Asignar o reasignar ejecutivo responsable"}</p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">{currentStatus === "RECEIVED" ? "Asigna un ejecutivo responsable y deja la solicitud en gestión." : "Registra al ejecutivo responsable de esta solicitud y deja trazabilidad para futuras gestiones."}</p>
             </div>
           </button>}
           {currentStatus === "ACCEPTED" && <button
@@ -310,9 +310,7 @@ export default function ManageStatusModal({
               <p className="text-xs text-[var(--text-secondary)]">Será el ejecutivo responsable de esta solicitud</p>
             </div>
           </div>
-          <p className="text-sm text-[var(--text-secondary)]">
-            Al confirmar, la solicitud pasará al estado <strong className="text-[var(--navy)]">En gestión</strong> y quedará asociada a este ejecutivo. Esta acción se registrará en el historial de la solicitud.
-          </p>
+          
           {stage === "error" && (
             <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3">
               <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-600" />
