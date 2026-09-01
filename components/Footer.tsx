@@ -20,7 +20,7 @@ const services = [
   "Acceso internacional",
   "Importación de medicamentos",
   "Segunda opinión médica",
-  "Acompañamiento experto",
+  "Acompañamiento experto.",
 ];
 
 const information = [
