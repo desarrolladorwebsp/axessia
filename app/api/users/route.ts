@@ -1,8 +1,27 @@
 import { prisma } from "@/lib/prisma";
+import { INTERNAL_SESSION_COOKIE, verifyInternalSessionToken } from "@/lib/auth";
 import { NextRequest, NextResponse } from "next/server";
+import { cookies } from "next/headers";
 
 export async function GET(request: NextRequest) {
   try {
+    const cookieStore = await cookies();
+    const sessionToken = cookieStore.get(INTERNAL_SESSION_COOKIE)?.value;
+    const auth = verifyInternalSessionToken(sessionToken);
+
+    if (!auth) {
+      return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+    }
+
+    const actor = await prisma.user.findUnique({
+      where: { id: auth.userId },
+      select: { id: true, role: true },
+    });
+
+    if (!actor || actor.role !== "ADMINISTRADOR") {
+      return NextResponse.json({ error: "No tienes permisos para ver usuarios internos." }, { status: 403 });
+    }
+
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get("page") || "1");
     const limit = parseInt(searchParams.get("limit") || "10");
@@ -47,25 +66,34 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    const cookieStore = await cookies();
+    const sessionToken = cookieStore.get(INTERNAL_SESSION_COOKIE)?.value;
+    const auth = verifyInternalSessionToken(sessionToken);
+
+    if (!auth) {
+      return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+    }
+
+    const actor = await prisma.user.findUnique({
+      where: { id: auth.userId },
+      select: { id: true, role: true },
+    });
+
+    if (!actor || actor.role !== "ADMINISTRADOR") {
+      return NextResponse.json({ error: "No tienes permisos para crear usuarios internos." }, { status: 403 });
+    }
+
     const body = await request.json();
     const { firstName, lastName, email, rut, role } = body;
 
-    // Validaciones básicas
     if (!firstName || !lastName || !email || !rut || !role) {
-      return NextResponse.json(
-        { error: "Todos los campos son requeridos" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Todos los campos son requeridos" }, { status: 400 });
     }
 
     if (!["EJECUTIVO", "ADMINISTRADOR"].includes(role)) {
-      return NextResponse.json(
-        { error: "Rol inválido" },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: "Rol inválido" }, { status: 400 });
     }
 
-    // Verificar que email y rut sean únicos
     const existingUser = await prisma.user.findFirst({
       where: {
         OR: [
@@ -76,13 +104,9 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingUser) {
-      return NextResponse.json(
-        { error: "El email o RUT ya está registrado" },
-        { status: 409 }
-      );
+      return NextResponse.json({ error: "El email o RUT ya está registrado" }, { status: 409 });
     }
 
-    // Crear usuario
     const user = await prisma.user.create({
       data: {
         firstName: firstName.trim(),
@@ -94,7 +118,7 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json(
-      { 
+      {
         message: "Usuario creado correctamente",
         user: {
           id: user.id,
@@ -108,9 +132,6 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("Error creating user:", error);
-    return NextResponse.json(
-      { error: "Error al crear usuario" },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: "Error al crear usuario" }, { status: 500 });
   }
 }

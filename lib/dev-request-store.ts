@@ -136,8 +136,9 @@ export type DevQuoteRecord = {
 };
 
 export function shouldUseJsonStorage() {
-  const appEnv = process.env.APP_ENV?.toLowerCase() ?? "";
-  return appEnv === "development" || appEnv === "developer" || process.env.NODE_ENV === "development";
+  // El sistema usa Prisma como fuente de verdad. El almacenamiento en JSON solo se
+  // mantiene como compatibilidad histórica, pero no debe activarse para la app actual.
+  return false;
 }
 
 async function ensureStorageFile() {

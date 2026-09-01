@@ -39,17 +39,47 @@ enum UserRole {
   ADMINISTRADOR
 }
 
+enum InternalInvitationStatus {
+  PENDING
+  USED
+  EXPIRED
+  INVALID
+}
+
 model User {
-  id                 String              @id @default(cuid())
+  id                 String                    @id @default(cuid())
   firstName          String
   lastName           String
-  email              String              @unique
-  rut                String              @unique
-  role               UserRole            @default(EJECUTIVO)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  email              String                    @unique
+  rut                String                    @unique
+  phone              String?
+  role               UserRole                  @default(EJECUTIVO)
+  passwordHash       String?
+  avatarUrl          String?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
   quoteRequestEvents QuoteRequestEvent[]
-  assignedRequests   QuoteRequest[]      @relation("AssignedExecutiveRequests")
+  assignedRequests   QuoteRequest[]            @relation("AssignedExecutiveRequests")
+  invitationsSent    InternalUserInvitation[]  @relation("InvitationSentBy")
+}
+
+model InternalUserInvitation {
+  id          String                    @id @default(cuid())
+  email       String
+  rut         String
+  role        UserRole
+  token       String                    @unique
+  status      InternalInvitationStatus  @default(PENDING)
+  expiresAt   DateTime
+  usedAt      DateTime?
+  createdAt   DateTime                  @default(now())
+  sentAt      DateTime?
+  invitedById String?
+  invitedBy   User?                     @relation("InvitationSentBy", fields: [invitedById], references: [id], onDelete: SetNull)
+
+  @@index([email])
+  @@index([rut])
+  @@index([status, expiresAt])
 }
 
 model Customer {

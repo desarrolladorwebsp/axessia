@@ -18,11 +18,6 @@ export default function LoginView() {
     event.preventDefault();
     setError("");
 
-    if (accountType === "executive") {
-      setError("El acceso ejecutivo estará disponible próximamente.");
-      return;
-    }
-
     if (!email.trim() || !password.trim()) {
       setError("Ingresa tu correo y contraseña para continuar.");
       return;
@@ -34,7 +29,7 @@ export default function LoginView() {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email, password, accountType }),
       });
       const result = (await response.json()) as { error?: string; message?: string };
 
@@ -42,7 +37,7 @@ export default function LoginView() {
         throw new Error(result.error ?? "No fue posible iniciar sesión.");
       }
 
-      window.location.href = "/mi-cuenta";
+      window.location.href = accountType === "executive" ? "/app" : "/mi-cuenta";
     } catch (submissionError) {
       setError(submissionError instanceof Error ? submissionError.message : "No fue posible iniciar sesión.");
     } finally {
@@ -72,7 +67,7 @@ export default function LoginView() {
           </button>
           <button type="button" className={accountType === "executive" ? "is-selected" : ""} onClick={() => setAccountType("executive")} aria-pressed={accountType === "executive"}>
             <BriefcaseBusiness size={18} aria-hidden="true" />
-            <span>Cliente ejecutivo</span>
+            <span>Usuario interno</span>
           </button>
         </div>
 
@@ -88,7 +83,7 @@ export default function LoginView() {
           <button type="button" className="login-recovery">¿Olvidaste tu contraseña?</button>
           {error && <p className="register-message register-message-error">{error}</p>}
           <button type="submit" className="login-submit" disabled={isSubmitting}>
-            {isSubmitting ? "Ingresando..." : `Ingresar como ${accountType === "client" ? "cliente" : "cliente ejecutivo"}`}
+            {isSubmitting ? "Ingresando..." : `Ingresar como ${accountType === "client" ? "cliente" : "usuario interno"}`}
             <ArrowRight size={18} aria-hidden="true" />
           </button>
         </motion.form>
