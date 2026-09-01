@@ -104,8 +104,8 @@ export async function POST(request: Request) {
 
     const token = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
-    const baseUrl = process.env.APP_URL ?? "https://axessia.cl";
-    const invitationUrl = `${baseUrl}/invitacion/${token}`;
+    const baseUrl = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? "https://axessia.vercel.app";
+    const invitationUrl = `${baseUrl.replace(/\/$/, "")}/invitacion/${token}`;
 
     const invitation = await prisma.internalUserInvitation.create({
       data: {
