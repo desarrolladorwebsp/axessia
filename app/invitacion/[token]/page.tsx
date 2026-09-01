@@ -16,12 +16,32 @@ function InvalidInvitationView({ message }: { message: string }) {
   );
 }
 
+function DatabaseUnavailableView({ token }: { token: string }) {
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-[var(--background)] px-4 py-10">
+      <section className="w-full max-w-xl rounded-3xl border border-[var(--border)] bg-white p-8 text-center shadow-[0_16px_40px_rgba(7,30,65,0.08)]">
+        <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 text-2xl">🛠️</div>
+        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[var(--purple)]">Error técnico</p>
+        <h1 className="mt-4 text-3xl font-extrabold tracking-tight text-[var(--navy)]">No se pudo validar la invitación</h1>
+        <p className="mt-3 text-sm leading-6 text-[var(--text-secondary)]">
+          Se detectó un problema de conexión con la base de datos del sistema. La invitación no pudo verificarse en este momento.
+          Contacta al equipo de soporte y reporta este incidente con el código de la invitación: <span className="font-semibold text-[var(--navy)]">{token}</span>.
+        </p>
+        <a href="/ingresar" className="mt-6 inline-flex items-center justify-center rounded-full bg-[var(--navy)] px-5 py-3 text-sm font-semibold text-white shadow-sm transition hover:bg-[var(--navy-dark)]">Volver al inicio</a>
+      </section>
+    </main>
+  );
+}
+
 export default async function InvitationPage({ params }: { params: Promise<{ token: string }> }) {
+  let token = "desconocido";
+
   try {
-    const { token } = await params;
+    const resolvedParams = await params;
+    token = resolvedParams.token;
 
     if (!process.env.DATABASE_URL) {
-      return <InvalidInvitationView message="La configuración de la base de datos de producción no está disponible en este entorno. Revisa DATABASE_URL y vuelve a intentarlo." />;
+      return <DatabaseUnavailableView token={token} />;
     }
 
     const invitation = await prisma.internalUserInvitation.findUnique({
@@ -48,6 +68,6 @@ export default async function InvitationPage({ params }: { params: Promise<{ tok
     return <InvitationRegistrationForm token={token} invitation={{ email: normalizeEmail(invitation.email), rut: normalizeRut(invitation.rut), role: invitation.role }} />;
   } catch (error) {
     console.error("Invitation page failed to load:", error);
-    return <InvalidInvitationView message="La invitación no pudo validarse en este momento porque la base de datos no está disponible. Revisa la conexión de producción y vuelve a intentarlo." />;
+    return <DatabaseUnavailableView token={token} />;
   }
 }
