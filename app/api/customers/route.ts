@@ -20,7 +20,6 @@ export async function GET(request: NextRequest) {
     const actor = await prisma.user.findUnique({ where: { id: auth.userId }, select: { id: true } });
     if (!actor) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
 
-    import { getInternalActor } from "@/lib/internal-access";
     const { searchParams } = new URL(request.url);
     const page = Math.max(1, Number.parseInt(searchParams.get("page") || "1", 10));
     const limit = Math.max(1, Math.min(Number.parseInt(searchParams.get("limit") || "10", 10), 50));
@@ -46,16 +45,6 @@ export async function GET(request: NextRequest) {
         email: true,
         phone: true,
         rut: true,
-      if ((payload as { internal?: unknown }).internal === true) {
-        if (!await getInternalActor()) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
-        if (![firstName, lastName, phone, email, rut, city].every((value) => value && value.trim() !== "")) return NextResponse.json({ error: "Completa todos los campos obligatorios." }, { status: 400 });
-        if (!/^\S+@\S+\.\S+$/.test(email)) return NextResponse.json({ error: "Revisa el formato del correo." }, { status: 400 });
-        if (!isValidRut(rut)) return NextResponse.json({ error: "El RUT ingresado no es válido. Verifica el dígito verificador." }, { status: 400 });
-        const existing = await prisma.customer.findFirst({ where: { OR: [{ email }, { rut }] }, select: { id: true } });
-        if (existing) return NextResponse.json({ error: "El correo o RUT ya está registrado." }, { status: 409 });
-        const customer = await prisma.customer.create({ data: { name: fullName, phone, email, rut, city }, select: { id: true, name: true, email: true, phone: true, rut: true, city: true, createdAt: true } });
-        return NextResponse.json({ ...customer, createdAt: customer.createdAt.toISOString() }, { status: 201 });
-      }
         city: true,
         hasPendingRequest: true,
         createdAt: true,
