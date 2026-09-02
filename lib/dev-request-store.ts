@@ -14,6 +14,7 @@ export type DevQuoteRequestRecord = {
   patientName: string | null;
   patientRut: string | null;
   status: "RECEIVED" | "SOURCING" | "QUOTED" | "AWAITING_DECISION" | "ACCEPTED" | "SHIPPING" | "REJECTED" | "CANCELLED" | "COMPLETED";
+  origin: "WEB" | "EJECUTIVO";
   price?: number | null;
   acceptsPolicies: boolean;
   acceptsDataTreatment: boolean;

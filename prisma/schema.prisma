@@ -46,6 +46,11 @@ enum InternalInvitationStatus {
   INVALID
 }
 
+enum QuoteRequestOrigin {
+  WEB
+  EJECUTIVO
+}
+
 model User {
   id                 String                    @id @default(cuid())
   firstName          String
@@ -112,6 +117,7 @@ model QuoteRequest {
   patientName          String?
   patientRut           String?
   status               QuoteRequestStatus    @default(RECEIVED)
+  origin               QuoteRequestOrigin    @default(WEB)
   assignedExecutiveId  String?
   acceptsPolicies      Boolean
   acceptsDataTreatment Boolean
@@ -135,6 +141,7 @@ model QuoteRequest {
   @@index([requesterEmail])
   @@index([requesterRut])
   @@index([assignedExecutiveId])
+  @@index([origin])
 }
 
 model GeneratedMandate {

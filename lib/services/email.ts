@@ -1,7 +1,9 @@
 import { Resend } from "resend";
 
 export const AXESSIA_EMAIL = "no-reply@axessia.cl";
-export const ADMIN_EMAIL = process.env.ADMIN_EMAIL_ADDRESS || "admin@axessia.cl";
+export const EMAIL_FORM = process.env.EMAIL_FORM || process.env.ADMIN_EMAIL_ADDRESS || "administracion@axessia.cl";
+export const EMAIL_NOTIFICATION = process.env.EMAIL_NOTIFICATION || process.env.ADMIN_EMAIL_ADDRESS || "administracion@axessia.cl";
+export const ADMIN_EMAIL = EMAIL_NOTIFICATION;
 
 // Initialize Resend only if API key is available
 // If not configured, emails will be skipped gracefully
@@ -150,10 +152,31 @@ export async function sendInternalQuoteRequestNotification(
   });
 
   await sendEmail({
-    to: ADMIN_EMAIL,
+    to: EMAIL_NOTIFICATION,
     subject: `Nueva Solicitud de Cotización: ${requestNumber}`,
     html,
     replyTo: customerEmail,
+  });
+}
+
+/**
+ * Send a public contact form message to the admin inbox.
+ * Awaited so the contact API can report a real success/error to the user.
+ */
+export async function sendContactMessageEmail(params: {
+  name: string;
+  email: string;
+  phone: string;
+  subject: string;
+  message: string;
+}): Promise<void> {
+  const html = generateContactMessageEmail(params);
+
+  await sendEmailAwaited({
+    to: EMAIL_FORM,
+    subject: `Nuevo mensaje de contacto: ${params.subject}`,
+    html,
+    replyTo: params.email,
   });
 }
 
@@ -607,6 +630,145 @@ function generateInternalQuoteRequestEmail({
 }
 
 /**
+ * HTML template for the public contact form notification
+ */
+function generateContactMessageEmail({
+  name,
+  email,
+  phone,
+  subject,
+  message,
+}: {
+  name: string;
+  email: string;
+  phone: string;
+  subject: string;
+  message: string;
+}): string {
+  return `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          line-height: 1.6;
+          color: #071E41;
+          background-color: #F7F9FC;
+        }
+        .container {
+          max-width: 600px;
+          margin: 0 auto;
+          background-color: #FFFFFF;
+          border-radius: 16px;
+          overflow: hidden;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+        .header {
+          background: linear-gradient(90deg, #071E41 0%, #04152F 100%);
+          padding: 30px 20px;
+          text-align: center;
+        }
+        .logo {
+          font-family: 'Montserrat', sans-serif;
+          font-size: 24px;
+          font-weight: 700;
+          color: #FFFFFF;
+          margin: 0;
+        }
+        .content {
+          padding: 30px;
+        }
+        .title {
+          font-size: 18px;
+          font-weight: 600;
+          margin-bottom: 20px;
+          color: #071E41;
+        }
+        .detail-row {
+          display: flex;
+          padding: 12px 0;
+          border-bottom: 1px solid #DCE4ED;
+        }
+        .detail-row:last-child {
+          border-bottom: none;
+        }
+        .detail-label {
+          flex: 0 0 150px;
+          font-weight: 600;
+          color: #4F5F73;
+          font-size: 13px;
+        }
+        .detail-value {
+          flex: 1;
+          color: #071E41;
+          font-size: 13px;
+        }
+        .message-box {
+          background-color: #F7F9FC;
+          border-left: 4px solid #087FD5;
+          padding: 16px;
+          margin-top: 20px;
+          border-radius: 8px;
+          font-size: 13px;
+          color: #071E41;
+          white-space: pre-wrap;
+        }
+        .action-link {
+          color: #087FD5;
+          text-decoration: none;
+          font-weight: 600;
+        }
+        .footer {
+          background-color: #F7F9FC;
+          padding: 20px;
+          text-align: center;
+          font-size: 11px;
+          color: #4F5F73;
+          border-top: 1px solid #DCE4ED;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <h1 class="logo">AXESSIA — Nuevo Mensaje de Contacto</h1>
+        </div>
+
+        <div class="content">
+          <div class="title">${escapeHtml(subject)}</div>
+
+          <div class="detail-row">
+            <div class="detail-label">Nombre:</div>
+            <div class="detail-value">${escapeHtml(name)}</div>
+          </div>
+
+          <div class="detail-row">
+            <div class="detail-label">Email:</div>
+            <div class="detail-value"><a href="mailto:${escapeHtml(email)}" class="action-link">${escapeHtml(email)}</a></div>
+          </div>
+
+          <div class="detail-row">
+            <div class="detail-label">Teléfono:</div>
+            <div class="detail-value">${escapeHtml(phone)}</div>
+          </div>
+
+          <div class="message-box">${escapeHtml(message)}</div>
+        </div>
+
+        <div class="footer">
+          <p>Este mensaje fue enviado desde el formulario de contacto de axessia.cl</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+}
+
+/**
  * Send quote acceptance confirmation email to customer
  */
 export async function sendQuoteAcceptedEmail(
@@ -645,7 +807,7 @@ export async function sendInternalQuoteAcceptedNotification(
   });
 
   await sendEmail({
-    to: ADMIN_EMAIL,
+    to: EMAIL_NOTIFICATION,
     subject: `Cotización Aceptada: ${quoteNumber} (${requestNumber})`,
     html,
     replyTo: customerEmail,
@@ -695,7 +857,7 @@ export async function sendInternalQuoteRejectedNotification(
   });
 
   await sendEmail({
-    to: ADMIN_EMAIL,
+    to: EMAIL_NOTIFICATION,
     subject: `Cotización Rechazada: ${quoteNumber} (${requestNumber})`,
     html,
     replyTo: customerEmail,

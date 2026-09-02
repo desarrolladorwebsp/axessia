@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { Clock3, FileText, Globe2, Mail, MapPin, MessageCircle, Phone, ShieldCheck, UsersRound } from "lucide-react";
+import { AtSign, Clock3, FileText, Globe2, Mail, MapPin, MessageCircle, Phone, ShieldCheck } from "lucide-react";
 
 const navigation = [
   ["Inicio", "/"],
@@ -56,11 +56,10 @@ export default function Footer() {
           <Link href="/" className="footer-logo">AXESSIA</Link>
           <p>Acceso inteligente a soluciones de salud.</p>
           <div className="footer-socials" aria-label="Redes sociales">
-            <Link href="/contacto" aria-label="Red social, canal pendiente"><Globe2 size={19} aria-hidden="true" /></Link>
-            <Link href="/contacto" aria-label="Red profesional, canal pendiente"><UsersRound size={19} aria-hidden="true" /></Link>
-            <Link href="/contacto" aria-label="WhatsApp, canal pendiente"><MessageCircle size={19} aria-hidden="true" /></Link>
+            <a href="https://www.instagram.com/axessia.cl/" target="_blank" rel="noreferrer" aria-label="Instagram AXESSIA"><AtSign size={19} aria-hidden="true" /></a>
+            <a href="https://www.facebook.com/profile.php?id=61593967287064" target="_blank" rel="noreferrer" aria-label="Facebook AXESSIA"><Globe2 size={19} aria-hidden="true" /></a>
           </div>
-          <small>Redes sociales disponibles próximamente.</small>
+          <small>Síguenos en nuestras redes.</small>
         </motion.div>
 
         <FooterColumn title="Navegación" items={navigation} />

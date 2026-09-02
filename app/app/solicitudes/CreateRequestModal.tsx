@@ -46,8 +46,13 @@ export default function CreateRequestModal({ open, onClose, onCreated }: { open:
     if (isSubmitting) return;
     const validCustomer = [form.name, form.email, form.phone, form.rut, form.city].every((value) => value.trim());
     const validProducts = products.every((product) => product.commercialName.trim() && product.activeIngredient.trim() && product.concentration.trim() && Number(product.tabletQuantity) > 0);
-    if (!validCustomer || !form.prescription || !validProducts || !form.acceptsPolicies || !form.acceptsDataTreatment) {
-      setError("Completa los datos del cliente, receta, medicamentos y consentimientos obligatorios.");
+    const missing: string[] = [];
+    if (!validCustomer) missing.push("datos del cliente");
+    if (!form.prescription) missing.push("receta médica (adjunta un archivo)");
+    if (!validProducts) missing.push("medicamentos");
+    if (!form.acceptsPolicies || !form.acceptsDataTreatment) missing.push("consentimientos obligatorios");
+    if (missing.length > 0) {
+      setError(`Falta completar: ${missing.join(", ")}.`);
       return;
     }
     try {

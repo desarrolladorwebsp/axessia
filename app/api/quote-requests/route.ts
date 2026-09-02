@@ -1,7 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
-import { Prisma, QuoteRequestStatus } from "@prisma/client";
+import { Prisma, QuoteRequestStatus, QuoteRequestOrigin } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
-import { createDevRequestNotification, shouldUseJsonStorage, readDevQuoteRequests, writeDevQuoteRequests } from "@/lib/dev-request-store";
+import { createDevRequestNotification, readDevQuotes, shouldUseJsonStorage, readDevQuoteRequests, writeDevQuoteRequests } from "@/lib/dev-request-store";
 import { sendQuoteRequestReceivedEmail, sendInternalQuoteRequestNotification } from "@/lib/services/email";
 import { normalizeSearchValue } from "@/lib/search";
 import { getInternalActor } from "@/lib/internal-access";
@@ -42,25 +42,46 @@ export async function GET(request: NextRequest) {
     const status = Object.values(QuoteRequestStatus).includes(statusParam as QuoteRequestStatus)
       ? statusParam as QuoteRequestStatus
       : undefined;
+    const originParam = searchParams.get("origin");
+    const origin = Object.values(QuoteRequestOrigin).includes(originParam as QuoteRequestOrigin)
+      ? originParam as QuoteRequestOrigin
+      : undefined;
     const executive = searchParams.get("executive");
     const rawQuery = searchParams.get("q") ?? "";
     const query = normalizeSearchValue(rawQuery);
     const requestedPage = Number.parseInt(searchParams.get("page") || "1", 10);
     const requestedLimit = Number.parseInt(searchParams.get("limit") || "10", 10);
+    const hasPeriod = searchParams.has("month") || searchParams.has("year");
+    const requestedMonth = Number.parseInt(searchParams.get("month") || String(new Date().getMonth() + 1), 10);
+    const requestedYear = Number.parseInt(searchParams.get("year") || String(new Date().getFullYear()), 10);
     const page = Number.isFinite(requestedPage) && requestedPage > 0 ? requestedPage : 1;
     const limit = Number.isFinite(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 50) : 10;
+    const month = Number.isFinite(requestedMonth) ? Math.min(Math.max(requestedMonth, 1), 12) : new Date().getMonth() + 1;
+    const year = Number.isFinite(requestedYear) && requestedYear > 0 ? requestedYear : new Date().getFullYear();
+    const monthStart = new Date(year, month - 1, 1);
+    const monthEnd = new Date(year, month, 1);
 
     if (shouldUseJsonStorage()) {
       const records = await readDevQuoteRequests();
+      const recordsInPeriod = hasPeriod ? records.filter((record) => {
+        const createdAt = new Date(record.createdAt);
+        return createdAt >= monthStart && createdAt < monthEnd;
+      }) : records;
       const filtered = status
-        ? records.filter((record) => record.status === status)
-        : records;
+        ? recordsInPeriod.filter((record) => record.status === status)
+        : recordsInPeriod;
+      const filteredByOrigin = origin ? filtered.filter((record) => record.origin === origin) : filtered;
 
-      const sorted = [...filtered].sort(
+      const sorted = [...filteredByOrigin].sort(
         (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
       const total = sorted.length;
       const paginated = sorted.slice((page - 1) * limit, page * limit);
+      const storedQuotes = await readDevQuotes();
+      const quoteCount = hasPeriod ? storedQuotes.filter((quote) => {
+        const createdAt = new Date(quote.createdAt);
+        return createdAt >= monthStart && createdAt < monthEnd;
+      }).length : storedQuotes.length;
 
       const statusCounts = sorted.reduce<Record<string, number>>((accumulator, record) => {
         accumulator[record.status] = (accumulator[record.status] ?? 0) + 1;
@@ -71,7 +92,7 @@ export async function GET(request: NextRequest) {
         totalRequests: total,
         received: statusCounts.RECEIVED ?? 0,
         inManagement: (statusCounts.RECEIVED ?? 0) + (statusCounts.SOURCING ?? 0),
-        quoted: statusCounts.QUOTED ?? 0,
+        quoted: quoteCount,
         pendingDecision: statusCounts.AWAITING_DECISION ?? 0,
         accepted: statusCounts.ACCEPTED ?? 0,
         shipping: statusCounts.SHIPPING ?? 0,
@@ -107,7 +128,9 @@ export async function GET(request: NextRequest) {
     }
 
     const where: Prisma.QuoteRequestWhereInput = {
+      ...(hasPeriod ? { createdAt: { gte: monthStart, lt: monthEnd } } : {}),
       ...(status ? { status } : {}),
+      ...(origin ? { origin } : {}),
       ...(executive === "unassigned" ? { assignedExecutiveId: null } : {}),
       ...(query
         ? {
@@ -123,7 +146,7 @@ export async function GET(request: NextRequest) {
     };
     const skip = (page - 1) * limit;
 
-    const [quotes, total, statusSummary] = await Promise.all([
+    const [quotes, total, statusSummary, quoteCount] = await Promise.all([
       prisma.quoteRequest.findMany({
         where,
         include: {
@@ -151,6 +174,9 @@ export async function GET(request: NextRequest) {
         _count: { status: true },
         where,
       }),
+      prisma.quote.count({
+        where: hasPeriod ? { createdAt: { gte: monthStart, lt: monthEnd } } : {},
+      }),
     ]);
 
     const statusCounts = Object.fromEntries(statusSummary.map((item) => [item.status, item._count.status]));
@@ -163,7 +189,7 @@ export async function GET(request: NextRequest) {
       totalRequests: total,
       received: statusCounts.RECEIVED ?? 0,
       inManagement: (statusCounts.RECEIVED ?? 0) + (statusCounts.SOURCING ?? 0),
-      quoted: statusCounts.QUOTED ?? 0,
+      quoted: quoteCount,
       pendingDecision: statusCounts.AWAITING_DECISION ?? 0,
       accepted: statusCounts.ACCEPTED ?? 0,
       shipping: statusCounts.SHIPPING ?? 0,
@@ -206,7 +232,10 @@ export async function GET(request: NextRequest) {
 export async function POST(request: Request) {
   const payload = (await request.json()) as QuoteRequestPayload;
   const selectedCustomerId = typeof payload.customerId === "string" ? payload.customerId.trim() : "";
-  if (selectedCustomerId && !await getInternalActor()) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+  const internalActor = await getInternalActor();
+  if (selectedCustomerId && !internalActor) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+  // El origen se determina en el servidor según quién ejecuta la creación; el cliente nunca lo envía ni lo controla.
+  const origin = internalActor ? "EJECUTIVO" as const : "WEB" as const;
 
   if (!payload.acceptsPolicies || !payload.acceptsDataTreatment) {
     return NextResponse.json({ error: "Los consentimientos son obligatorios." }, { status: 400 });
@@ -236,6 +265,7 @@ export async function POST(request: Request) {
       patientName: payload.patient?.name || null,
       patientRut: payload.patient?.rut || null,
       status: "RECEIVED" as const,
+      origin,
       price: null,
       acceptsPolicies: payload.acceptsPolicies,
       acceptsDataTreatment: payload.acceptsDataTreatment,
@@ -324,6 +354,7 @@ export async function POST(request: Request) {
         requesterCity: customer.city,
         patientName: payload.patient?.name || null,
         patientRut: payload.patient?.rut || null,
+        origin,
         acceptsPolicies: payload.acceptsPolicies,
         acceptsDataTreatment: payload.acceptsDataTreatment,
         prescriptions: { create: payload.prescription },
@@ -335,7 +366,7 @@ export async function POST(request: Request) {
     const request = await transaction.quoteRequest.update({
       where: { sequence: createdRequest.sequence },
       data: { requestNumber: `S-${100000 + createdRequest.sequence}` },
-      select: { id: true, requestNumber: true, customerId: true, status: true, createdAt: true, customer: { select: { name: true, email: true } } },
+      select: { id: true, requestNumber: true, customerId: true, status: true, origin: true, createdAt: true, customer: { select: { name: true, email: true } } },
     });
 
     await transaction.quoteRequestEvent.create({

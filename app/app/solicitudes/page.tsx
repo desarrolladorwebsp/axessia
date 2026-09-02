@@ -19,6 +19,7 @@ interface QuoteRequestItem {
   id: string;
   requestNumber: string | null;
   status: string;
+  origin: string;
   price: number | null;
   createdAt: string;
   requesterName?: string | null;
@@ -49,6 +50,8 @@ interface PaginationData {
 
 const statusLabels: Record<string, string> = { RECEIVED: "Recibida", SOURCING: "En gestión", QUOTED: "Cotizada", AWAITING_DECISION: "Esperando respuesta", ACCEPTED: "Aceptada", SHIPPING: "En despacho", REJECTED: "Rechazada", CANCELLED: "Cancelada", COMPLETED: "Finalizada" };
 const statusTones: Record<string, StatusTone> = { RECEIVED: "info", SOURCING: "progress", QUOTED: "accent", AWAITING_DECISION: "accent", ACCEPTED: "success", SHIPPING: "progress", REJECTED: "danger", CANCELLED: "neutral", COMPLETED: "neutral" };
+const originLabels: Record<string, string> = { WEB: "Web", EJECUTIVO: "Ejecutivo" };
+const originTones: Record<string, StatusTone> = { WEB: "info", EJECUTIVO: "accent" };
 
 export default function SolicitudesPage() {
   const router = useRouter();
@@ -58,6 +61,7 @@ export default function SolicitudesPage() {
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("Todos");
+  const [origin, setOrigin] = useState("Todos");
   const [executive, setExecutive] = useState("Todos");
   const [showCreateRequest, setShowCreateRequest] = useState(false);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -73,6 +77,10 @@ export default function SolicitudesPage() {
           const statusValue = Object.entries(statusLabels).find(([, label]) => label === status)?.[0];
           if (statusValue) params.set("status", statusValue);
         }
+        if (origin !== "Todos") {
+          const originValue = Object.entries(originLabels).find(([, label]) => label === origin)?.[0];
+          if (originValue) params.set("origin", originValue);
+        }
         if (executive === "Sin asignar") params.set("executive", "unassigned");
         const response = await fetch(`/api/quote-requests?${params.toString()}`);
         if (!response.ok) throw new Error("Error al cargar solicitudes");
@@ -84,7 +92,7 @@ export default function SolicitudesPage() {
       }
     };
     fetchSolicitudes();
-  }, [page, query, status, executive, refreshKey]);
+  }, [page, query, status, origin, executive, refreshKey]);
 
   const updateQuery = (value: string) => {
     setPage(1);
@@ -94,6 +102,11 @@ export default function SolicitudesPage() {
   const updateStatus = (value: string) => {
     setPage(1);
     setStatus(value);
+  };
+
+  const updateOrigin = (value: string) => {
+    setPage(1);
+    setOrigin(value);
   };
 
   const updateExecutive = (value: string) => {
@@ -147,6 +160,7 @@ export default function SolicitudesPage() {
           <FilterBar>
             <SearchField value={query} onChange={updateQuery} placeholder="Buscar por cliente, ID de solicitud o producto..." label="Buscar solicitudes" />
             <FilterSelect label="Estado" value={status} onChange={updateStatus} options={["Todos", ...Object.values(statusLabels)]} />
+            <FilterSelect label="Origen" value={origin} onChange={updateOrigin} options={["Todos", ...Object.values(originLabels)]} />
             <FilterSelect label="Ejecutivo asignado" value={executive} onChange={updateExecutive} options={["Todos", "Sin asignar"]} />
           </FilterBar>
 
@@ -156,7 +170,7 @@ export default function SolicitudesPage() {
                 <thead>
                   <tr className="border-b border-[var(--border)] bg-[var(--background)]">
                     <th className="w-12 px-4 py-3"><input type="checkbox" aria-label="Seleccionar todas" className="accent-[var(--purple)]" /></th>
-                    {["ID solicitud", "Cliente", "Producto / Medicamento", "Fecha recepción", "Estado actual", "Ejecutivo", "Acciones"].map((header) => (
+                    {["ID solicitud", "Cliente", "Producto / Medicamento", "Fecha recepción", "Estado actual", "Origen", "Ejecutivo", "Acciones"].map((header) => (
                       <th key={header} className="px-3 py-3 text-[10px] font-bold uppercase tracking-wide text-[var(--navy)]">
                         {header}<ChevronDown className="ml-1 inline h-3 w-3 text-[var(--text-secondary)]" />
                       </th>
@@ -210,6 +224,7 @@ function RequestRow({ request, index, onOpen }: { request: QuoteRequestItem; ind
         {new Date(request.createdAt).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}
       </td>
       <td className="px-3 py-4"><StatusBadge label={statusLabels[request.status] || request.status} tone={statusTones[request.status]} /></td>
+      <td className="px-3 py-4"><StatusBadge label={originLabels[request.origin] || request.origin} tone={originTones[request.origin] ?? "neutral"} /></td>
       <td className="px-3 py-4">
         {request.assignedExecutive ? (
           <div className="flex items-center gap-2">
@@ -245,6 +260,7 @@ function MobileRequestCard({ request, index, onOpen }: { request: QuoteRequestIt
         <span>{request.medications[0]?.commercialName || "Sin medicamento"}</span>
         <span>{new Date(request.createdAt).toLocaleDateString("es-CL")}</span>
       </div>
+      <div className="mt-2"><StatusBadge label={originLabels[request.origin] || request.origin} tone={originTones[request.origin] ?? "neutral"} /></div>
     </motion.article>
   );
 }
