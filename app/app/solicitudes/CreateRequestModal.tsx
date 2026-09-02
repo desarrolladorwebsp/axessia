@@ -55,6 +55,7 @@ export default function CreateRequestModal({ open, onClose, onCreated }: { open:
       setError(`Falta completar: ${missing.join(", ")}.`);
       return;
     }
+    if (!form.prescription) return;
     try {
       setIsSubmitting(true);
       setError("");

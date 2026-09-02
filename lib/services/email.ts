@@ -1579,6 +1579,51 @@ function generateInternalQuoteRejectedEmail({
 }
 
 /**
+ * Notify AXESSIA when a customer needs help with a payment issue.
+ * Fire-and-forget so the customer action is not blocked by email delivery.
+ */
+export async function sendPaymentHelpRequestEmail(params: {
+  customerName: string;
+  customerEmail: string;
+  requestNumber: string;
+  quoteNumber: string;
+  paymentReference: string | null;
+  message: string;
+}): Promise<void> {
+  const html = `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head><meta charset="UTF-8" /><title>Ayuda con pago</title></head>
+    <body style="font-family: 'Plus Jakarta Sans', sans-serif; color: #071E41; background: #F7F9FC; padding: 24px;">
+      <div style="max-width: 640px; margin: 0 auto; background: #fff; border-radius: 16px; border: 1px solid #DCE4ED; overflow: hidden;">
+        <div style="background: linear-gradient(90deg, #071E41 0%, #04152F 100%); color: #fff; padding: 24px;">
+          <h1 style="margin: 0; font-size: 20px;">Ayuda con pago solicitada</h1>
+        </div>
+        <div style="padding: 24px;">
+          <p><strong>Cliente:</strong> ${escapeHtml(params.customerName)}</p>
+          <p><strong>Correo:</strong> ${escapeHtml(params.customerEmail)}</p>
+          <p><strong>Solicitud:</strong> ${escapeHtml(params.requestNumber)}</p>
+          <p><strong>Cotización:</strong> ${escapeHtml(params.quoteNumber)}</p>
+          <p><strong>Referencia de pago:</strong> ${escapeHtml(params.paymentReference || "Sin referencia")}</p>
+          <div style="margin-top: 16px; padding: 16px; border-radius: 12px; background: #F7F9FC; border-left: 4px solid #087FD5;">
+            ${escapeHtml(params.message)}
+          </div>
+          <p style="margin-top: 16px; font-size: 13px; color: #4F5F73;">La cotización permanece aceptada. El cliente puede reintentar el pago mientras se gestiona la ayuda.</p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
+
+  await sendEmail({
+    to: EMAIL_NOTIFICATION,
+    subject: `Ayuda con pago: ${params.requestNumber} / ${params.quoteNumber}`,
+    html,
+    replyTo: params.customerEmail,
+  });
+}
+
+/**
  * Escape HTML special characters to prevent injection
  */
 function escapeHtml(text: string): string {

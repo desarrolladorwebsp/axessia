@@ -25,7 +25,7 @@ export const REQUEST_STATUS_DESCRIPTIONS: Record<string, string> = {
   SOURCING: "Un ejecutivo responsable gestiona alternativas para tu solicitud.",
   QUOTED: "La cotización fue creada y está lista para ser enviada.",
   AWAITING_DECISION: "La cotización fue enviada y esperamos la respuesta del cliente.",
-  ACCEPTED: "La cotización fue aceptada y el pago fue confirmado.",
+  ACCEPTED: "La cotización fue aceptada. El pago se gestiona por separado y solo se confirma con resultado real de la pasarela.",
   SHIPPING: "El medicamento está en proceso de despacho o envío.",
   COMPLETED: "El proceso de la solicitud fue finalizado.",
   REJECTED: "La solicitud o cotización fue rechazada.",

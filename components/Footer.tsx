@@ -4,7 +4,26 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { AtSign, Clock3, FileText, Globe2, Mail, MapPin, MessageCircle, Phone, ShieldCheck } from "lucide-react";
+import { Clock3, FileText, Mail, MapPin, MessageCircle, Phone, ShieldCheck } from "lucide-react";
+
+// lucide-react no incluye íconos de marcas (Instagram/Facebook); se definen manualmente.
+function InstagramIcon({ size = 19 }: { size?: number }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+      <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+      <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+    </svg>
+  );
+}
+
+function FacebookIcon({ size = 19 }: { size?: number }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M18 2h-3a5 5 0 0 0-5 5v3H7v4h3v8h4v-8h3l1-4h-4V7a1 1 0 0 1 1-1h3z" />
+    </svg>
+  );
+}
 
 const navigation = [
   ["Inicio", "/"],
@@ -56,8 +75,8 @@ export default function Footer() {
           <Link href="/" className="footer-logo">AXESSIA</Link>
           <p>Acceso inteligente a soluciones de salud.</p>
           <div className="footer-socials" aria-label="Redes sociales">
-            <a href="https://www.instagram.com/axessia.cl/" target="_blank" rel="noreferrer" aria-label="Instagram AXESSIA"><AtSign size={19} aria-hidden="true" /></a>
-            <a href="https://www.facebook.com/profile.php?id=61593967287064" target="_blank" rel="noreferrer" aria-label="Facebook AXESSIA"><Globe2 size={19} aria-hidden="true" /></a>
+            <a href="https://www.instagram.com/axessia.cl/" target="_blank" rel="noreferrer" aria-label="Instagram AXESSIA"><InstagramIcon /></a>
+            <a href="https://www.facebook.com/profile.php?id=61593967287064" target="_blank" rel="noreferrer" aria-label="Facebook AXESSIA"><FacebookIcon /></a>
           </div>
           <small>Síguenos en nuestras redes.</small>
         </motion.div>

@@ -29,6 +29,20 @@ enum QuoteStatus {
   VOIDED
 }
 
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  PAID
+  FAILED
+  CANCELLED
+  HELP_REQUESTED
+}
+
+enum PaymentProvider {
+  SIMULATED
+  BANCHILE
+}
+
 enum QuoteItemCondition {
   AVAILABLE
   SPECIAL_IMPORT
@@ -135,6 +149,7 @@ model QuoteRequest {
   internalNotes        QuoteRequestNote[]
   events               QuoteRequestEvent[]
   notifications        Notification[]
+  payments             Payment[]
 
   @@index([customerId])
   @@index([status])
@@ -181,13 +196,21 @@ model MandateDocument {
 }
 
 model Notification {
-  id        String       @id @default(cuid())
-  requestId String       @unique
-  isRead    Boolean      @default(false)
-  createdAt DateTime     @default(now())
-  request   QuoteRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  id        String           @id @default(cuid())
+  requestId String
+  type      NotificationType @default(NEW_REQUEST)
+  isRead    Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  request   QuoteRequest     @relation(fields: [requestId], references: [id], onDelete: Cascade)
 
+  @@index([requestId, createdAt])
   @@index([isRead, createdAt])
+}
+
+enum NotificationType {
+  NEW_REQUEST
+  QUOTE_ACCEPTED
+  QUOTE_REJECTED
 }
 
 model Prescription {
@@ -237,11 +260,37 @@ model Quote {
   request              QuoteRequest          @relation(fields: [requestId], references: [id], onDelete: Restrict)
   items                QuoteItem[]
   quoteRequestComments QuoteRequestComment[]
+  payments             Payment[]
 
   @@unique([requestId, version])
   @@index([requestId])
   @@index([customerId])
   @@index([status])
+}
+
+model Payment {
+  id                String          @id @default(cuid())
+  requestId         String
+  quoteId           String
+  amount            Decimal         @db.Decimal(12, 2)
+  currency          String          @default("CLP")
+  status            PaymentStatus   @default(PENDING)
+  provider          PaymentProvider @default(SIMULATED)
+  providerReference String?         @unique
+  checkoutUrl       String?         @db.Text
+  failureReason     String?         @db.Text
+  helpMessage       String?         @db.Text
+  paidAt            DateTime?
+  failedAt          DateTime?
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  request           QuoteRequest    @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  quote             Quote           @relation(fields: [quoteId], references: [id], onDelete: Restrict)
+
+  @@index([requestId, createdAt])
+  @@index([quoteId])
+  @@index([status])
+  @@index([providerReference])
 }
 
 model QuoteItem {

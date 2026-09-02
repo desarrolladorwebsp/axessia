@@ -18,6 +18,7 @@ export async function GET() {
       select: {
         id: true,
         requestId: true,
+        type: true,
         isRead: true,
         createdAt: true,
         request: { select: { requestNumber: true, requesterName: true } },
@@ -28,6 +29,7 @@ export async function GET() {
       notifications: notifications.map((notification) => ({
         id: notification.id,
         requestId: notification.requestId,
+        type: notification.type,
         requestNumber: notification.request.requestNumber ?? "Solicitud sin número",
         requesterName: notification.request.requesterName,
         isRead: notification.isRead,

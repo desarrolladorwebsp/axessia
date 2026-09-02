@@ -43,12 +43,21 @@ export type PageHeaderProps = {
   showUtilities?: boolean;
 };
 
+type NotificationType = "NEW_REQUEST" | "QUOTE_ACCEPTED" | "QUOTE_REJECTED";
+
 type NotificationItem = {
   id: string;
   requestId: string;
+  type: NotificationType;
   requestNumber: string;
   requesterName: string;
   createdAt: string;
+};
+
+const notificationMessages: Record<NotificationType, (requesterName: string) => string> = {
+  NEW_REQUEST: (requesterName) => `Nueva solicitud de ${requesterName}`,
+  QUOTE_ACCEPTED: (requesterName) => `${requesterName} aceptó su cotización`,
+  QUOTE_REJECTED: (requesterName) => `${requesterName} rechazó su cotización`,
 };
 
 export default function PageHeader({
@@ -136,9 +145,9 @@ export default function PageHeader({
               )}
             </button>
             {isNotificationsOpen && (
-              <div id="notification-panel" className="absolute right-0 z-30 mt-2 w-80 overflow-hidden rounded-xl border border-[var(--border)] bg-white shadow-[0_16px_36px_rgba(7,30,65,0.14)]">
+              <div id="notification-panel" className="absolute left-0 z-30 mt-2 w-80 max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-[var(--border)] bg-white shadow-[0_16px_36px_rgba(7,30,65,0.14)] xl:left-auto xl:right-0">
                 <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
-                  <p className="text-xs font-extrabold text-[var(--navy)]">Nuevas solicitudes</p>
+                  <p className="text-xs font-extrabold text-[var(--navy)]">Notificaciones</p>
                   {isLoadingNotifications ? <LoaderCircle className="h-4 w-4 animate-spin text-[var(--blue)]" /> : <CheckCheck className="h-4 w-4 text-[var(--blue)]" aria-hidden="true" />}
                 </div>
                 {notifications.length > 0 ? (
@@ -147,14 +156,14 @@ export default function PageHeader({
                       <li key={notification.id}>
                         <button type="button" onClick={() => void openNotification(notification)} className="w-full rounded-lg px-3 py-3 text-left transition-colors hover:bg-[var(--background)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue)]">
                           <p className="text-xs font-extrabold text-[var(--navy)]">{notification.requestNumber}</p>
-                          <p className="mt-0.5 text-xs text-[var(--text-secondary)]">Nueva solicitud de {notification.requesterName}</p>
+                          <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{(notificationMessages[notification.type] ?? notificationMessages.NEW_REQUEST)(notification.requesterName)}</p>
                           <time className="mt-1 block text-[10px] font-semibold text-[var(--blue)]" dateTime={notification.createdAt}>{new Date(notification.createdAt).toLocaleString("es-CL", { dateStyle: "short", timeStyle: "short" })}</time>
                         </button>
                       </li>
                     ))}
                   </ul>
                 ) : (
-                  <p className="px-4 py-6 text-center text-xs text-[var(--text-secondary)]">No tienes solicitudes nuevas.</p>
+                  <p className="px-4 py-6 text-center text-xs text-[var(--text-secondary)]">No tienes notificaciones nuevas.</p>
                 )}
               </div>
             )}

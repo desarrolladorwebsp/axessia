@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
         await transaction.quoteRequestEvent.create({ data: { requestId, status: "QUOTED", eventType: "QUOTE_CREATED" } });
       }
       return numbered;
-    });
+    }, { maxWait: 10000, timeout: 20000 });
     return NextResponse.json({ ...quote, total: quote.total?.toString() ?? null, validUntil: quote.validUntil?.toISOString() ?? null, createdAt: quote.createdAt.toISOString(), updatedAt: quote.updatedAt.toISOString() }, { status: 201 });
   } catch (error) {
     if (error instanceof Error && (error.message === "Solicitud no encontrada" || error.message.startsWith("Producto") || error.message === "La solicitud no está disponible para crear una cotización")) return NextResponse.json({ error: error.message }, { status: error.message === "Solicitud no encontrada" ? 404 : error.message === "La solicitud no está disponible para crear una cotización" ? 409 : 400 });

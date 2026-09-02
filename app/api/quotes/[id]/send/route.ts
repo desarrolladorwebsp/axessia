@@ -71,7 +71,7 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
       await transaction.quoteRequest.update({ where: { id: quote.request.id }, data: { status: "AWAITING_DECISION" } });
       await transaction.quoteRequestEvent.create({ data: { requestId: quote.request.id, status: "AWAITING_DECISION", eventType: "QUOTE_SENT" } });
       return sent;
-    });
+    }, { maxWait: 10000, timeout: 20000 });
     return NextResponse.json({
       ...updated,
       total: updated.total?.toString() ?? null,
