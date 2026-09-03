@@ -60,7 +60,7 @@ export default function OperationsProcess() {
     <section className="operations-process" aria-labelledby="operations-process-title">
       <div className="operations-intro">
         <Image
-          src="/images/OperationsProcess-section/bg-operationes.png"
+          src="/images/OperationsProcess-section/bg-operations-process.png"
           alt="Equipo de operaciones AXESSIA gestionando solicitudes de salud"
           fill
           priority={false}
