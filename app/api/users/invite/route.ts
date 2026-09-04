@@ -4,18 +4,7 @@ import { NextResponse } from "next/server";
 import { INTERNAL_SESSION_COOKIE, verifyInternalSessionToken } from "@/lib/auth";
 import { isValidRut, normalizeEmail, normalizeRut } from "@/lib/customer-validation";
 import { prisma } from "@/lib/prisma";
-import { sendEmailAwaited } from "@/lib/services/email";
-
-function getBaseUrl(): string {
-  const configured = process.env.APP_URL ?? process.env.NEXT_PUBLIC_APP_URL ?? process.env.VERCEL_URL ?? process.env.NEXT_PUBLIC_VERCEL_URL ?? process.env.VERCEL_PROJECT_PRODUCTION_URL;
-
-  if (configured) {
-    const normalized = configured.startsWith("http") ? configured : `https://${configured}`;
-    return normalized.replace(/\/$/, "");
-  }
-
-  return "https://axessia.vercel.app";
-}
+import { getAppUrl, sendEmailAwaited } from "@/lib/services/email";
 
 function buildInvitationEmail({ fullName, invitationUrl }: { fullName: string; invitationUrl: string }) {
   const brandName = "AXESSIA";
@@ -115,7 +104,7 @@ export async function POST(request: Request) {
 
     const token = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * 7);
-    const baseUrl = getBaseUrl();
+    const baseUrl = getAppUrl();
     const invitationUrl = `${baseUrl}/invitacion/${token}`;
 
     const invitation = await prisma.internalUserInvitation.create({

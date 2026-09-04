@@ -42,5 +42,9 @@ export function readTrackingToken(token: string) {
 }
 
 export function normalizeRut(rut: string) {
-  return rut.replace(/[^0-9kK]/g, "").toLowerCase();
+  return normalizeTrackingIdentifier(rut);
+}
+
+export function normalizeTrackingIdentifier(value: string) {
+  return value.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
 }

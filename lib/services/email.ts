@@ -5,6 +5,17 @@ export const EMAIL_FORM = process.env.EMAIL_FORM || process.env.ADMIN_EMAIL_ADDR
 export const EMAIL_NOTIFICATION = process.env.EMAIL_NOTIFICATION || process.env.ADMIN_EMAIL_ADDRESS || "administracion@axessia.cl";
 export const ADMIN_EMAIL = EMAIL_NOTIFICATION;
 
+export function getAppUrl(): string {
+  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+
+  if (!configuredUrl) {
+    return "https://axessia.cl";
+  }
+
+  const urlWithProtocol = /^https?:\/\//i.test(configuredUrl) ? configuredUrl : `https://${configuredUrl}`;
+  return urlWithProtocol.replace(/\/$/, "");
+}
+
 // Initialize Resend only if API key is available
 // If not configured, emails will be skipped gracefully
 let resend: Resend | null = null;
@@ -190,7 +201,8 @@ function generateQuoteRequestReceivedEmail({
   customerName: string;
   requestNumber: string;
 }): string {
-  const trackingUrl = `https://axessia.cl/seguimiento/${requestNumber}`;
+  const appUrl = getAppUrl();
+  const trackingUrl = `${appUrl}/seguimiento/${encodeURIComponent(requestNumber)}`;
 
   return `
     <!DOCTYPE html>
@@ -315,7 +327,7 @@ function generateQuoteRequestReceivedEmail({
 
           <div class="message" style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #DCE4ED;">
             <p><strong>¿Preguntas?</strong></p>
-            <p>Si tienes dudas o necesitas contactarnos, responde a este correo o visita nuestra sección de <a href="https://axessia.cl/preguntas-frecuentes" style="color: #087FD5; text-decoration: none;">Preguntas Frecuentes</a>.</p>
+            <p>Si tienes dudas o necesitas contactarnos, responde a este correo o visita nuestra sección de <a href="${appUrl}/preguntas-frecuentes" style="color: #087FD5; text-decoration: none;">Preguntas Frecuentes</a>.</p>
           </div>
         </div>
 
@@ -349,7 +361,8 @@ function generateQuoteReadyEmail({
   total: string | number | null;
   validUntil: string | null;
 }): string {
-  const trackingUrl = `https://axessia.cl/seguimiento/${requestNumber}`;
+  const appUrl = getAppUrl();
+  const trackingUrl = `${appUrl}/seguimiento/${encodeURIComponent(requestNumber)}`;
   const totalLabel = total !== null ? `$${Number(total).toLocaleString("es-CL")}` : "Por confirmar";
   const validUntilLabel = validUntil ? new Date(validUntil).toLocaleDateString("es-CL", { dateStyle: "long" }) : "Sin fecha límite";
 
@@ -477,7 +490,7 @@ function generateQuoteReadyEmail({
 
           <div class="message" style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #DCE4ED;">
             <p><strong>¿Preguntas?</strong></p>
-            <p>Si tienes dudas o necesitas contactarnos, responde a este correo o visita nuestra sección de <a href="https://axessia.cl/preguntas-frecuentes" style="color: #087FD5; text-decoration: none;">Preguntas Frecuentes</a>.</p>
+            <p>Si tienes dudas o necesitas contactarnos, responde a este correo o visita nuestra sección de <a href="${appUrl}/preguntas-frecuentes" style="color: #087FD5; text-decoration: none;">Preguntas Frecuentes</a>.</p>
           </div>
         </div>
 
@@ -509,6 +522,8 @@ function generateInternalQuoteRequestEmail({
   requestNumber: string;
   medicationCount: number;
 }): string {
+  const appUrl = getAppUrl();
+
   return `
     <!DOCTYPE html>
     <html lang="es">
@@ -616,7 +631,7 @@ function generateInternalQuoteRequestEmail({
           </div>
 
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #DCE4ED;">
-            <a href="https://axessia.cl/app/solicitudes/${requestNumber}" class="action-link" style="display: inline-block; padding: 8px 16px; background-color: #F7F9FC; border-radius: 8px; text-decoration: none;">Ver solicitud en el dashboard →</a>
+            <a href="${appUrl}/app/solicitudes/${encodeURIComponent(requestNumber)}" class="action-link" style="display: inline-block; padding: 8px 16px; background-color: #F7F9FC; border-radius: 8px; text-decoration: none;">Ver solicitud en el dashboard →</a>
           </div>
         </div>
 
@@ -1067,6 +1082,8 @@ function generateInternalQuoteAcceptedEmail({
   requestNumber: string;
   quoteNumber: string;
 }): string {
+  const appUrl = getAppUrl();
+
   return `
     <!DOCTYPE html>
     <html lang="es">
@@ -1185,7 +1202,7 @@ function generateInternalQuoteAcceptedEmail({
           </div>
 
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #DCE4ED;">
-            <a href="https://axessia.cl/app/solicitudes/${requestNumber}" class="action-link" style="display: inline-block; padding: 8px 16px; background-color: #F7F9FC; border-radius: 8px; text-decoration: none;">Ver solicitud en el dashboard →</a>
+            <a href="${appUrl}/app/solicitudes/${encodeURIComponent(requestNumber)}" class="action-link" style="display: inline-block; padding: 8px 16px; background-color: #F7F9FC; border-radius: 8px; text-decoration: none;">Ver solicitud en el dashboard →</a>
           </div>
         </div>
 
@@ -1417,6 +1434,8 @@ function generateInternalQuoteRejectedEmail({
   quoteNumber: string;
   rejectionReason?: string;
 }): string {
+  const appUrl = getAppUrl();
+
   return `
     <!DOCTYPE html>
     <html lang="es">
@@ -1565,7 +1584,7 @@ function generateInternalQuoteRejectedEmail({
           }
 
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #DCE4ED;">
-            <a href="https://axessia.cl/app/solicitudes/${requestNumber}" class="action-link" style="display: inline-block; padding: 8px 16px; background-color: #F7F9FC; border-radius: 8px; text-decoration: none;">Ver solicitud en el dashboard →</a>
+            <a href="${appUrl}/app/solicitudes/${encodeURIComponent(requestNumber)}" class="action-link" style="display: inline-block; padding: 8px 16px; background-color: #F7F9FC; border-radius: 8px; text-decoration: none;">Ver solicitud en el dashboard →</a>
           </div>
         </div>
 
