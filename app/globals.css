@@ -3439,7 +3439,7 @@ h6 {
   border-top: 1px solid var(--border);
   display: grid;
   gap: 0.75rem;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   margin-top: 1.5rem;
   padding-top: 1.25rem;
 }
@@ -3469,10 +3469,6 @@ h6 {
   max-height: 3.5rem;
   object-fit: contain;
   width: 100%;
-}
-
-.footer-partner-logo-ccs img {
-  transform: scale(1.65);
 }
 
 .footer-payment-logos {
@@ -3548,9 +3544,10 @@ h6 {
 
   .footer-partner-logos {
     border-top: 0;
+    grid-template-columns: repeat(4, 1fr);
     margin-top: 0;
     padding-top: 0;
-    width: 42%;
+    width: 52%;
   }
 
   .footer-trust {

@@ -51,7 +51,8 @@ const information = [
 
 const partners = [
   { src: "/images/footer/logo-banchile_pagos.svg", alt: "Banco de Chile" },
-  { src: "/images/footer/logo-camara-de-comercio-santiago.jpeg", alt: "Cámara de Comercio de Santiago." },
+  { src: "/images/footer/logo-asefarm.jpeg", alt: "Asefarm Spa Consultores" },
+  { src: "/images/footer/logo-isp.png", alt: "Instituto de Salud Pública" },
   { src: "/images/footer/logo-dhl.png", alt: "DHL" },
 ];
 
@@ -105,7 +106,7 @@ export default function Footer() {
         </div>
         <div className="footer-partner-logos" aria-label="Aliados estratégicos de AXESSIA">
           {partners.map((partner) => (
-            <span className={`footer-partner-logo ${partner.alt === "Cámara de Comercio de Santiago" ? "footer-partner-logo-ccs" : ""}`} key={partner.src}>
+            <span className="footer-partner-logo" key={partner.src}>
               <Image src={partner.src} alt={partner.alt} width={150} height={60} />
             </span>
           ))}

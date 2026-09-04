@@ -15,6 +15,8 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
+import { trackingStorageKey } from "@/lib/tracking-normalization";
+
 type QuoteItem = {
   id: string;
   productName: string;
@@ -124,7 +126,7 @@ const money = (value: string | number | null | undefined) => {
 };
 
 function tokenKey(requestNumber: string) {
-  return `axessia-tracking-${requestNumber.toUpperCase()}`;
+  return trackingStorageKey(requestNumber);
 }
 
 function getToken(requestNumber: string) {

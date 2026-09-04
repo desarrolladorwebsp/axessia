@@ -1,5 +1,14 @@
 import { createHmac, timingSafeEqual } from "crypto";
 
+export {
+  normalizeRut,
+  normalizeRutForComparison,
+  normalizeTrackingIdentifier,
+  buildRequestNumberVariants,
+  trackingStorageKey,
+  matchesTrackingCredentials,
+} from "@/lib/tracking-normalization";
+
 const TOKEN_TTL_SECONDS = 15 * 60;
 
 function getSecret() {
@@ -39,12 +48,4 @@ export function readTrackingToken(token: string) {
   } catch {
     return null;
   }
-}
-
-export function normalizeRut(rut: string) {
-  return normalizeTrackingIdentifier(rut);
-}
-
-export function normalizeTrackingIdentifier(value: string) {
-  return value.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
 }
