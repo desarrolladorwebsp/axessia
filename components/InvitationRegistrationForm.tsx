@@ -110,7 +110,7 @@ export default function InvitationRegistrationForm({ token, invitation }: Invita
 
           <div className="grid gap-5 md:grid-cols-2">
             <label className="block text-sm font-medium text-[var(--navy)]">
-              Teléfono
+              Teléfono.
               <input
                 className="mt-2 w-full rounded-xl border border-[var(--border)] px-4 py-3 text-sm outline-none focus:border-[var(--blue)]"
                 value={form.phone}
