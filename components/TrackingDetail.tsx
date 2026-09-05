@@ -17,6 +17,8 @@ import {
 
 import { trackingStorageKey } from "@/lib/tracking-normalization";
 
+import TrackingRutGate from "@/components/TrackingRutGate";
+
 type QuoteItem = {
   id: string;
   productName: string;
@@ -145,14 +147,18 @@ export default function TrackingDetail({ requestNumber }: { requestNumber: strin
   const [confirmKind, setConfirmKind] = useState<ConfirmKind>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [advancedWithoutPayment, setAdvancedWithoutPayment] = useState(false);
+  const [needsAuth, setNeedsAuth] = useState(false);
 
   const loadDetail = useCallback(async () => {
     const token = getToken(requestNumber);
     if (!token) {
-      setError("Vuelve a /seguimiento y valida tu solicitud para continuar.");
+      setNeedsAuth(true);
       setDetail(null);
+      setError("");
       return;
     }
+
+    setNeedsAuth(false);
     const response = await fetch(`/api/tracking/detail?token=${encodeURIComponent(token)}`);
     if (!response.ok) throw new Error("La sesión de seguimiento expiró. Vuelve a validar tu solicitud.");
     const payload = (await response.json()) as Detail;
@@ -324,6 +330,24 @@ export default function TrackingDetail({ requestNumber }: { requestNumber: strin
         <LoaderCircle className="mx-auto animate-spin" aria-label="Cargando" />
         <p className="mt-3 text-sm">Cargando tu cotización de forma segura…</p>
       </main>
+    );
+  }
+
+  if (needsAuth) {
+    return (
+      <TrackingRutGate
+        requestNumber={requestNumber}
+        onVerified={async () => {
+          setLoading(true);
+          try {
+            await loadDetail();
+          } catch (cause) {
+            setError(cause instanceof Error ? cause.message : "No fue posible cargar la cotización.");
+          } finally {
+            setLoading(false);
+          }
+        }}
+      />
     );
   }
 

@@ -12,7 +12,10 @@ export {
 const TOKEN_TTL_SECONDS = 15 * 60;
 
 function getSecret() {
-  const secret = process.env.TRACKING_SECRET ?? process.env.NEXTAUTH_SECRET;
+  const secret =
+    process.env.TRACKING_SECRET ??
+    process.env.AUTH_SECRET ??
+    process.env.NEXTAUTH_SECRET;
   if (!secret && process.env.NODE_ENV === "production") {
     throw new Error("TRACKING_SECRET must be configured in production");
   }
