@@ -190,6 +190,20 @@ export async function sendInternalQuoteRequestNotification(
  * Send a public contact form message to the admin inbox.
  * Awaited so the contact API can report a real success/error to the user.
  */
+export async function sendPasswordResetEmail(params: {
+  email: string;
+  fullName: string;
+  resetUrl: string;
+}): Promise<void> {
+  const html = generatePasswordResetEmail(params);
+
+  await sendEmailAwaited({
+    to: params.email,
+    subject: "Restablece tu contraseña - AXESSIA",
+    html,
+  });
+}
+
 export async function sendContactMessageEmail(params: {
   name: string;
   email: string;
@@ -1666,6 +1680,127 @@ export async function sendPaymentHelpRequestEmail(params: {
     html,
     replyTo: params.customerEmail,
   });
+}
+
+/**
+ * HTML template for internal password reset email
+ */
+function generatePasswordResetEmail({
+  fullName,
+  resetUrl,
+}: {
+  fullName: string;
+  resetUrl: string;
+}): string {
+  return `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+          font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+          line-height: 1.6;
+          color: #071E41;
+          background-color: #F7F9FC;
+        }
+        .container {
+          max-width: 600px;
+          margin: 0 auto;
+          background-color: #FFFFFF;
+          border-radius: 16px;
+          overflow: hidden;
+          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+        .header {
+          background: linear-gradient(90deg, #00A6D9 0%, #087FD5 45%, #7A28D8 100%);
+          padding: 40px 20px;
+          text-align: center;
+        }
+        .logo {
+          font-family: 'Montserrat', sans-serif;
+          font-size: 28px;
+          font-weight: 700;
+          color: #FFFFFF;
+          margin-bottom: 10px;
+        }
+        .content {
+          padding: 40px 30px;
+        }
+        .greeting {
+          font-size: 18px;
+          font-weight: 600;
+          margin-bottom: 20px;
+          color: #071E41;
+        }
+        .message {
+          font-size: 14px;
+          line-height: 1.8;
+          margin-bottom: 30px;
+          color: #4F5F73;
+        }
+        .cta-button {
+          display: inline-block;
+          background: linear-gradient(90deg, #00A6D9 0%, #087FD5 100%);
+          color: #FFFFFF;
+          padding: 12px 30px;
+          border-radius: 24px;
+          text-decoration: none;
+          font-weight: 600;
+          font-size: 14px;
+          margin: 20px 0;
+        }
+        .footer {
+          background-color: #F7F9FC;
+          padding: 30px;
+          text-align: center;
+          font-size: 12px;
+          color: #4F5F73;
+          border-top: 1px solid #DCE4ED;
+        }
+        .footer-text {
+          margin-bottom: 10px;
+        }
+      </style>
+    </head>
+    <body>
+      <div class="container">
+        <div class="header">
+          <div class="logo">AXESSIA</div>
+          <p style="color: rgba(255,255,255,0.9); font-size: 14px; margin: 0;">Sistema interno de gestión</p>
+        </div>
+
+        <div class="content">
+          <div class="greeting">Hola ${escapeHtml(fullName)},</div>
+
+          <div class="message">
+            <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta interna en AXESSIA.</p>
+            <p>Si fuiste tú, haz clic en el siguiente botón para crear una nueva contraseña. El enlace es de un solo uso y vence en 1 hora.</p>
+          </div>
+
+          <div style="text-align: center;">
+            <a href="${resetUrl}" class="cta-button">Restablecer contraseña</a>
+          </div>
+
+          <div class="message" style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #DCE4ED;">
+            <p>Si no solicitaste este cambio, puedes ignorar este correo. Tu contraseña actual seguirá siendo válida.</p>
+          </div>
+        </div>
+
+        <div class="footer">
+          <div class="footer-text">
+            © 2026 AXESSIA. Todos los derechos reservados.
+          </div>
+          <div class="footer-text" style="font-size: 11px; color: #8A96A8;">
+            <p>Este es un correo automatizado. Por favor no respondas con información sensible.</p>
+          </div>
+        </div>
+      </div>
+    </body>
+    </html>
+  `;
 }
 
 /**

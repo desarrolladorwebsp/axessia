@@ -71,20 +71,33 @@ enum ProductType {
 }
 
 model User {
-  id                 String                    @id @default(cuid())
+  id                 String                         @id @default(cuid())
   firstName          String
   lastName           String
-  email              String                    @unique
-  rut                String                    @unique
+  email              String                         @unique
+  rut                String                         @unique
   phone              String?
-  role               UserRole                  @default(EJECUTIVO)
+  role               UserRole                       @default(EJECUTIVO)
   passwordHash       String?
   avatarUrl          String?
-  createdAt          DateTime                  @default(now())
-  updatedAt          DateTime                  @updatedAt
+  createdAt          DateTime                       @default(now())
+  updatedAt          DateTime                       @updatedAt
   quoteRequestEvents QuoteRequestEvent[]
-  assignedRequests   QuoteRequest[]            @relation("AssignedExecutiveRequests")
-  invitationsSent    InternalUserInvitation[]  @relation("InvitationSentBy")
+  assignedRequests   QuoteRequest[]                 @relation("AssignedExecutiveRequests")
+  invitationsSent    InternalUserInvitation[]       @relation("InvitationSentBy")
+  passwordResetTokens InternalPasswordResetToken[]
+}
+
+model InternalPasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, usedAt, expiresAt])
 }
 
 model InternalUserInvitation {
