@@ -8,7 +8,10 @@
     "start": "next start",
     "lint": "eslint",
     "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev"
+    "db:migrate": "prisma migrate dev",
+    "test:upload": "node --env-file=.env scripts/test-prescription-upload.mjs",
+    "test:files": "node --env-file=.env scripts/test-file-operations.mjs",
+    "check:storage": "node --env-file=.env.local scripts/check-storage.mjs"
   },
   "dependencies": {
     "@prisma/client": "6.19.0",

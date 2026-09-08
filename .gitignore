@@ -41,3 +41,6 @@ yarn-error.log*
 next-env.d.ts
 
 /app/generated/prisma
+
+# local document storage (dev fallback when AXESSIA_STORAGE_ROOT is unset)
+/storage/

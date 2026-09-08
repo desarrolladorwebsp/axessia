@@ -4,16 +4,18 @@ import { FormEvent, useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import { AtSign, Check, Clock3, Globe2, MessageCircleQuestion, Send, ShieldCheck } from "lucide-react";
+import { CONTACT_MOTIVES } from "@/lib/contact";
 
 type ContactForm = {
   name: string;
   email: string;
   phone: string;
+  motive: string;
   subject: string;
   message: string;
 };
 
-const initialForm: ContactForm = { name: "", email: "", phone: "", subject: "", message: "" };
+const initialForm: ContactForm = { name: "", email: "", phone: "", motive: "", subject: "", message: "" };
 
 const perks = [
   { icon: MessageCircleQuestion, label: "Resolvemos tus dudas sobre el proceso de importación." },
@@ -39,7 +41,7 @@ export default function ContactPage() {
     setError("");
     setSuccess("");
 
-    if (!form.name.trim() || !form.email.trim() || !form.phone.trim() || !form.subject.trim() || !form.message.trim()) {
+    if (!form.name.trim() || !form.email.trim() || !form.phone.trim() || !form.motive || !form.subject.trim() || !form.message.trim()) {
       setError("Completa todos los campos obligatorios.");
       return;
     }
@@ -137,10 +139,19 @@ export default function ContactPage() {
                 <input type="tel" placeholder="Ej: +56 9 1234 5678" value={form.phone} onChange={(event) => update("phone", event.target.value)} required />
               </label>
               <label className="contact-field">
+                <span>Motivo</span>
+                <select value={form.motive} onChange={(event) => update("motive", event.target.value)} required>
+                  <option value="">Selecciona un motivo</option>
+                  {CONTACT_MOTIVES.map((motive) => (
+                    <option key={motive} value={motive}>{motive}</option>
+                  ))}
+                </select>
+              </label>
+              <label className="contact-field contact-field-wide">
                 <span>Asunto</span>
                 <input type="text" placeholder="Ej: Consulta sobre mi tratamiento" value={form.subject} onChange={(event) => update("subject", event.target.value)} required />
               </label>
-              <label className="contact-field">
+              <label className="contact-field contact-field-wide">
                 <span>Mensaje</span>
                 <textarea placeholder="Cuéntanos en qué podemos ayudarte" value={form.message} onChange={(event) => update("message", event.target.value)} required />
               </label>

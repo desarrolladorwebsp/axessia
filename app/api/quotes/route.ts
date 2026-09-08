@@ -1,20 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readDevQuotes, readDevQuoteRequests, shouldUseJsonStorage, writeDevQuotes, writeDevQuoteRequests, type DevQuoteRecord } from "@/lib/dev-request-store";
-import { parseQuoteItems, computeQuoteTotal, parseValidUntil, type QuoteItemPayload } from "@/lib/quote-items";
+import { parseQuoteItems, computeQuoteTotal, parseValidUntil, parseEstimatedShippingDays, type QuoteItemPayload } from "@/lib/quote-items";
+import { isProductType } from "@/lib/product-type";
 import { normalizeSearchValue } from "@/lib/search";
 import { getInternalActor } from "@/lib/internal-access";
 
 const quoteStatuses = ["DRAFT", "READY", "SENT", "ACCEPTED", "REJECTED", "EXPIRED", "VOIDED"] as const;
 
-type QuotePayload = { requestId?: unknown; validUntil?: unknown; items?: unknown; asDraft?: unknown };
+type QuotePayload = { requestId?: unknown; validUntil?: unknown; estimatedShippingDays?: unknown; items?: unknown; asDraft?: unknown };
 
 function invalid(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
 }
 
 export async function POST(request: NextRequest) {
-  if (!await getInternalActor()) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
+  const actor = await getInternalActor();
+  if (!actor) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   try {
     const payload = (await request.json()) as QuotePayload;
     const asDraft = payload.asDraft === true;
@@ -24,14 +26,14 @@ export async function POST(request: NextRequest) {
     if (!rawItems.length) return invalid("Agrega al menos un producto a la cotización");
 
     let validUntil: Date | null;
-    let items: ReturnType<typeof parseQuoteItems>;
+    let estimatedShippingDays: number | null;
+    let items: ReturnType<typeof parseQuoteItems> = [];
     try {
       validUntil = parseValidUntil(payload.validUntil, asDraft);
-      items = parseQuoteItems(rawItems, asDraft);
+      estimatedShippingDays = parseEstimatedShippingDays(payload.estimatedShippingDays, asDraft);
     } catch (validationError) {
       return invalid(validationError instanceof Error ? validationError.message : "Datos inválidos");
     }
-    const total = computeQuoteTotal(items);
     const status = asDraft ? "DRAFT" : "READY";
 
     if (shouldUseJsonStorage()) {
@@ -39,31 +41,74 @@ export async function POST(request: NextRequest) {
       const recordIndex = requests.findIndex((record) => record.id === requestId);
       if (recordIndex === -1) return NextResponse.json({ error: "Solicitud no encontrada" }, { status: 404 });
       const source = requests[recordIndex];
+      try {
+        items = parseQuoteItems(rawItems, asDraft, isProductType(source.productType) ? source.productType : "MEDICATION");
+      } catch (validationError) {
+        return invalid(validationError instanceof Error ? validationError.message : "Datos inválidos");
+      }
+      const total = computeQuoteTotal(items);
       const customerId = source.customerId ?? source.customer?.id ?? `dev-customer-${source.id}`;
       const customer = source.customer ?? { id: customerId, name: source.requesterName, phone: source.requesterPhone, email: source.requesterEmail, rut: source.requesterRut, city: source.requesterCity };
       const quotes = await readDevQuotes();
       const sequence = quotes.reduce((highest, quote) => Math.max(highest, quote.sequence), 0) + 1;
       const now = new Date().toISOString();
-      const quote: DevQuoteRecord = { id: `dev-quote-${Date.now()}`, sequence, quoteNumber: `C-${10000 + sequence}`, customerId, requestId, customer, request: { id: source.id, requestNumber: source.requestNumber, requesterName: source.requesterName, requesterEmail: source.requesterEmail }, version: quotes.filter((item) => item.requestId === requestId).length + 1, status, total, validUntil: validUntil ? validUntil.toISOString() : null, createdAt: now, sentAt: null, items: items.map((item, index) => ({ ...item, expirationDate: item.expirationDate ? item.expirationDate.toISOString() : null, id: `dev-quote-item-${Date.now()}-${index}` })) };
-      await writeDevQuotes([quote, ...quotes]);
+      const quote: DevQuoteRecord = { id: `dev-quote-${Date.now()}`, sequence, quoteNumber: `C-${10000 + sequence}`, customerId, requestId, customer, request: { id: source.id, requestNumber: source.requestNumber, requesterName: source.requesterName, requesterEmail: source.requesterEmail }, version: quotes.filter((item) => item.requestId === requestId).length + 1, status, total, validUntil: validUntil ? validUntil.toISOString() : null, estimatedShippingDays, createdAt: now, sentAt: null, items: items.map((item, index) => ({ ...item, expirationDate: item.expirationDate ? item.expirationDate.toISOString() : null, id: `dev-quote-item-${Date.now()}-${index}` })) };
+      const assignedExecutive = source.assignedExecutive ?? { id: actor.id, firstName: actor.firstName, lastName: actor.lastName };
+      const assignedNow = !source.assignedExecutive;
+      const nextEvents = [...(source.events ?? [])];
+      if (assignedNow) {
+        nextEvents.unshift({
+          id: `dev-event-${Date.now()}-assignment`,
+          status: source.status,
+          eventType: "EXECUTIVE_ASSIGNED",
+          note: `Ejecutivo asignado: ${actor.firstName} ${actor.lastName}`,
+          createdAt: now,
+        });
+      }
+      if (!asDraft && source.status !== "QUOTED") {
+        nextEvents.unshift({ id: `dev-event-${Date.now()}`, status: "QUOTED", eventType: "QUOTE_CREATED", createdAt: now });
+      }
       requests[recordIndex] = {
         ...source,
         customerId,
         customer,
+        assignedExecutive,
         status: asDraft ? source.status : "QUOTED",
         updatedAt: now,
-        events: asDraft || source.status === "QUOTED"
-          ? source.events
-          : [{ id: `dev-event-${Date.now()}`, status: "QUOTED", eventType: "QUOTE_CREATED", createdAt: now }, ...(source.events ?? [])],
+        events: nextEvents,
       };
+      await writeDevQuotes([quote, ...quotes]);
       await writeDevQuoteRequests(requests);
       return NextResponse.json(quote, { status: 201 });
     }
 
     const quote = await prisma.$transaction(async (transaction) => {
-      const source = await transaction.quoteRequest.findUnique({ where: { id: requestId }, select: { id: true, status: true, customerId: true, requesterName: true, requesterPhone: true, requesterEmail: true, requesterRut: true, requesterCity: true } });
+      const source = await transaction.quoteRequest.findUnique({ where: { id: requestId }, select: { id: true, status: true, productType: true, customerId: true, assignedExecutiveId: true, requesterName: true, requesterPhone: true, requesterEmail: true, requesterRut: true, requesterCity: true } });
       if (!source) throw new Error("Solicitud no encontrada");
+      try {
+        items = parseQuoteItems(rawItems, asDraft, source.productType);
+      } catch (validationError) {
+        throw validationError instanceof Error ? validationError : new Error("Datos inválidos");
+      }
+      const total = computeQuoteTotal(items);
       if (!["RECEIVED", "SOURCING", "QUOTED", "AWAITING_DECISION"].includes(source.status)) throw new Error("La solicitud no está disponible para crear una cotización");
+      if (!source.assignedExecutiveId) {
+        const assigned = await transaction.quoteRequest.updateMany({
+          where: { id: requestId, assignedExecutiveId: null },
+          data: { assignedExecutiveId: actor.id },
+        });
+        if (assigned.count > 0) {
+          await transaction.quoteRequestEvent.create({
+            data: {
+              requestId,
+              status: source.status,
+              eventType: "EXECUTIVE_ASSIGNED",
+              actorId: actor.id,
+              note: `Ejecutivo asignado: ${actor.firstName} ${actor.lastName}`,
+            },
+          });
+        }
+      }
       let customerId = source.customerId;
       if (!customerId) {
         const existingCustomer = await transaction.customer.findFirst({ where: { OR: [{ email: source.requesterEmail }, { rut: source.requesterRut }] }, select: { id: true } });
@@ -71,7 +116,7 @@ export async function POST(request: NextRequest) {
         await transaction.quoteRequest.update({ where: { id: requestId }, data: { customerId } });
       }
       const latest = await transaction.quote.findFirst({ where: { requestId }, orderBy: { version: "desc" }, select: { version: true } });
-      const created = await transaction.quote.create({ data: { customerId, requestId, version: (latest?.version ?? 0) + 1, status, total, validUntil, items: { create: items } }, include: { items: true, customer: { select: { id: true, name: true, email: true } }, request: { select: { id: true, requestNumber: true, requesterName: true, requesterEmail: true } } } });
+      const created = await transaction.quote.create({ data: { customerId, requestId, version: (latest?.version ?? 0) + 1, status, total, validUntil, estimatedShippingDays, items: { create: items } }, include: { items: true, customer: { select: { id: true, name: true, email: true } }, request: { select: { id: true, requestNumber: true, requesterName: true, requesterEmail: true } } } });
       const numbered = await transaction.quote.update({ where: { id: created.id }, data: { quoteNumber: `C-${10000 + created.sequence}` }, include: { items: true, customer: { select: { id: true, name: true, email: true } }, request: { select: { id: true, requestNumber: true, requesterName: true, requesterEmail: true } } } });
       if (!asDraft) {
         await transaction.quoteRequest.update({ where: { id: requestId }, data: { status: "QUOTED" } });

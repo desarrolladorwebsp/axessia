@@ -15,13 +15,19 @@ import {
   ShieldCheck,
 } from "lucide-react";
 
+import { formatEstimatedShippingDays } from "@/lib/quote-items";
+import { isMedicalDevice, quoteConditionLabel, type ProductType } from "@/lib/product-type";
 import { trackingStorageKey } from "@/lib/tracking-normalization";
 
 import TrackingRutGate from "@/components/TrackingRutGate";
 
 type QuoteItem = {
   id: string;
+  productType?: ProductType;
   productName: string;
+  brand?: string | null;
+  model?: string | null;
+  description?: string | null;
   activeIngredient: string | null;
   concentration: string | null;
   pharmaceuticalForm: string | null;
@@ -61,7 +67,9 @@ type Detail = {
   createdAt: string;
   updatedAt: string;
   patientName: string | null;
+  productType?: ProductType;
   medications: Array<{ commercialName: string; activeIngredient: string; concentration: string; tabletQuantity: number }>;
+  medicalDevices?: Array<{ name: string; brand: string | null; model: string | null; quantity: number | null; description: string | null }>;
   hasQuote: boolean;
   canDecide: boolean;
   canContinueAfterAccept: boolean;
@@ -74,6 +82,7 @@ type Detail = {
     status: string;
     total: string | number | null;
     validUntil: string | null;
+    estimatedShippingDays?: number | null;
     acceptedAt: string | null;
     sentAt: string | null;
     expired?: boolean;
@@ -114,10 +123,6 @@ const paymentLabels: Record<string, string> = {
   HELP_REQUESTED: "Ayuda solicitada",
 };
 
-const conditionLabels: Record<string, string> = {
-  AVAILABLE: "Medicamento disponible",
-  SPECIAL_IMPORT: "Importación especial",
-};
 
 const date = (value: string) => new Intl.DateTimeFormat("es-CL", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 const money = (value: string | number | null | undefined) => {
@@ -201,6 +206,7 @@ export default function TrackingDetail({ requestNumber }: { requestNumber: strin
 
   const paymentStatus = detail?.payment?.status;
   const quoteAccepted = detail?.status === "ACCEPTED" && detail.quote?.status === "ACCEPTED";
+  const shippingEstimate = formatEstimatedShippingDays(detail?.quote?.estimatedShippingDays);
   const paymentPaid = paymentStatus === "PAID";
   const paymentFailed = paymentStatus === "FAILED" || paymentStatus === "CANCELLED";
   const paymentHelp = paymentStatus === "HELP_REQUESTED";
@@ -397,26 +403,49 @@ export default function TrackingDetail({ requestNumber }: { requestNumber: strin
         <section className="card-surface mt-8 rounded-2xl p-5 sm:p-8">
           <h2 className="text-xl font-bold text-[var(--navy)]">Lo que solicitaste</h2>
           <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[520px] text-left text-sm">
-              <thead className="text-[var(--text-secondary)]">
-                <tr>
-                  <th className="pb-3">Medicamento</th>
-                  <th className="pb-3">Principio activo</th>
-                  <th className="pb-3">Concentración</th>
-                  <th className="pb-3 text-right">Cantidad</th>
-                </tr>
-              </thead>
-              <tbody>
-                {detail.medications.map((item) => (
-                  <tr className="border-t border-[var(--border)]" key={`${item.commercialName}-${item.concentration}`}>
-                    <td className="py-3 font-semibold text-[var(--navy)]">{item.commercialName}</td>
-                    <td className="py-3 text-[var(--text-secondary)]">{item.activeIngredient}</td>
-                    <td className="py-3 text-[var(--text-secondary)]">{item.concentration}</td>
-                    <td className="py-3 text-right text-[var(--text-secondary)]">{item.tabletQuantity}</td>
+            {isMedicalDevice(detail.productType) ? (
+              <table className="w-full min-w-[520px] text-left text-sm">
+                <thead className="text-[var(--text-secondary)]">
+                  <tr>
+                    <th className="pb-3">Dispositivo</th>
+                    <th className="pb-3">Marca</th>
+                    <th className="pb-3">Modelo</th>
+                    <th className="pb-3 text-right">Cantidad</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {(detail.medicalDevices ?? []).map((item) => (
+                    <tr className="border-t border-[var(--border)]" key={`${item.name}-${item.model ?? "sin-modelo"}`}>
+                      <td className="py-3 font-semibold text-[var(--navy)]">{item.name}</td>
+                      <td className="py-3 text-[var(--text-secondary)]">{item.brand || "No informada"}</td>
+                      <td className="py-3 text-[var(--text-secondary)]">{item.model || "No informado"}</td>
+                      <td className="py-3 text-right text-[var(--text-secondary)]">{item.quantity ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : (
+              <table className="w-full min-w-[520px] text-left text-sm">
+                <thead className="text-[var(--text-secondary)]">
+                  <tr>
+                    <th className="pb-3">Medicamento</th>
+                    <th className="pb-3">Principio activo</th>
+                    <th className="pb-3">Concentración</th>
+                    <th className="pb-3 text-right">Cantidad</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {detail.medications.map((item) => (
+                    <tr className="border-t border-[var(--border)]" key={`${item.commercialName}-${item.concentration}`}>
+                      <td className="py-3 font-semibold text-[var(--navy)]">{item.commercialName}</td>
+                      <td className="py-3 text-[var(--text-secondary)]">{item.activeIngredient}</td>
+                      <td className="py-3 text-[var(--text-secondary)]">{item.concentration}</td>
+                      <td className="py-3 text-right text-[var(--text-secondary)]">{item.tabletQuantity}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         </section>
 
@@ -435,6 +464,11 @@ export default function TrackingDetail({ requestNumber }: { requestNumber: strin
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                {shippingEstimate ? (
+                  <p className="rounded-full bg-[var(--background)] px-3 py-2 text-sm font-semibold text-[var(--text-secondary)]">
+                    Envío estimado: {shippingEstimate}
+                  </p>
+                ) : null}
                 {detail.quote.validUntil && (
                   <p className="rounded-full bg-[var(--background)] px-3 py-2 text-sm font-semibold text-[var(--text-secondary)]">
                     Vigente hasta {date(detail.quote.validUntil)}
@@ -456,21 +490,33 @@ export default function TrackingDetail({ requestNumber }: { requestNumber: strin
                     <div>
                       <p className="text-sm font-extrabold text-[var(--navy)]">{item.productName}</p>
                       <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
-                        {item.activeIngredient || "Principio activo no informado"}
-                        {item.concentration ? ` · ${item.concentration}` : ""}
+                        {isMedicalDevice(item.productType)
+                          ? [item.brand, item.model].filter(Boolean).join(" · ") || item.description || "Dispositivo médico"
+                          : `${item.activeIngredient || "Principio activo no informado"}${item.concentration ? ` · ${item.concentration}` : ""}`}
                       </p>
                     </div>
                     <p className="text-sm font-extrabold text-[var(--navy)]">{money(item.totalPrice)}</p>
                   </div>
                   <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
-                    <DetailField label="Forma farmacéutica" value={item.pharmaceuticalForm} />
-                    <DetailField label="Presentación" value={item.presentation} />
-                    <DetailField label="Unidades por presentación" value={item.unitsPerPackage ? String(item.unitsPerPackage) : null} />
-                    <DetailField label="Laboratorio" value={item.manufacturer} />
+                    {isMedicalDevice(item.productType) ? (
+                      <>
+                        <DetailField label="Marca" value={item.brand ?? null} />
+                        <DetailField label="Modelo" value={item.model ?? null} />
+                        <DetailField label="Descripción" value={item.description ?? null} />
+                        <DetailField label="Fabricante" value={item.manufacturer} />
+                      </>
+                    ) : (
+                      <>
+                        <DetailField label="Forma farmacéutica" value={item.pharmaceuticalForm} />
+                        <DetailField label="Presentación" value={item.presentation} />
+                        <DetailField label="Unidades por presentación" value={item.unitsPerPackage ? String(item.unitsPerPackage) : null} />
+                        <DetailField label="Laboratorio" value={item.manufacturer} />
+                      </>
+                    )}
                     <DetailField label="País de origen" value={item.originCountry} />
                     <DetailField label="País del proveedor" value={item.supplierCountry} />
                     <DetailField label="Registro sanitario" value={item.sanitaryRegistry} />
-                    <DetailField label="Condición" value={item.condition ? conditionLabels[item.condition] : null} />
+                    <DetailField label="Condición" value={quoteConditionLabel(item.condition, item.productType)} />
                     <DetailField label="Lote" value={item.batchNumber} />
                     <DetailField label="Vencimiento" value={item.expirationDate ? date(item.expirationDate) : null} />
                     <DetailField label="Cantidad" value={String(item.quantity)} />

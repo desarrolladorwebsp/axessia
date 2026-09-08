@@ -1,37 +1,21 @@
 import { NextResponse, NextRequest } from "next/server";
 import { Prisma, QuoteRequestStatus, QuoteRequestOrigin } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { savePrescriptionForRequest, validatePrescriptionUpload, type ValidatedPrescriptionUpload } from "@/lib/documents/prescription";
 import { createDevRequestNotification, readDevQuotes, shouldUseJsonStorage, readDevQuoteRequests, writeDevQuoteRequests } from "@/lib/dev-request-store";
 import { sendQuoteRequestReceivedEmail, sendInternalQuoteRequestNotification } from "@/lib/services/email";
 import { normalizeSearchValue } from "@/lib/search";
 import { getInternalActor } from "@/lib/internal-access";
+import { isMedicalDevice, isProductType, parseMedicalDeviceItems, parseMedicationItems, type ProductType } from "@/lib/product-type";
+import { parseQuoteRequestBody } from "@/lib/quote-request-post";
+import type { QuoteRequestFormPayload } from "@/lib/quote-request-form-data";
 
-type QuoteRequestPayload = {
-  customerId?: string;
-  customer: {
-    name: string;
-    phone: string;
-    email: string;
-    rut: string;
-    city: string;
-  };
-  patient?: {
-    name?: string;
-    rut?: string;
-  };
-  prescription: {
+type QuoteRequestPayload = QuoteRequestFormPayload & {
+  prescription?: {
     fileName: string;
     mimeType: string;
     fileSize: number;
-  };
-  medications: Array<{
-    commercialName: string;
-    activeIngredient: string;
-    concentration: string;
-    tabletQuantity: number;
-  }>;
-  acceptsPolicies: boolean;
-  acceptsDataTreatment: boolean;
+  } | null;
 };
 
 export async function GET(request: NextRequest) {
@@ -140,6 +124,7 @@ export async function GET(request: NextRequest) {
               { requesterEmail: { contains: query } },
               { customer: { is: { OR: [{ name: { contains: query } }, { email: { contains: query } }] } } },
               { medications: { some: { OR: [{ commercialName: { contains: query } }, { activeIngredient: { contains: query } }] } } },
+              { medicalDevices: { some: { OR: [{ name: { contains: query } }, { brand: { contains: query } }, { model: { contains: query } }] } } },
             ],
           }
         : {}),
@@ -162,6 +147,7 @@ export async function GET(request: NextRequest) {
             select: { id: true, firstName: true, lastName: true },
           },
           medications: true,
+          medicalDevices: true,
           prescriptions: true,
         },
         orderBy: { createdAt: "desc" },
@@ -230,7 +216,20 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: Request) {
-  const payload = (await request.json()) as QuoteRequestPayload;
+  let payload: QuoteRequestPayload;
+  let prescriptionFile: File | null = null;
+
+  try {
+    const parsed = await parseQuoteRequestBody(request);
+    payload = parsed.payload;
+    prescriptionFile = parsed.prescriptionFile;
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "La solicitud está incompleta." },
+      { status: 400 },
+    );
+  }
+
   const selectedCustomerId = typeof payload.customerId === "string" ? payload.customerId.trim() : "";
   const internalActor = await getInternalActor();
   if (selectedCustomerId && !internalActor) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
@@ -241,8 +240,29 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Los consentimientos son obligatorios." }, { status: 400 });
   }
 
-  if (!payload.customer || !payload.prescription || !payload.medications?.length) {
-    return NextResponse.json({ error: "La solicitud está incompleta." }, { status: 400 });
+  const productType: ProductType = isProductType(payload.productType) ? payload.productType : "MEDICATION";
+  const deviceRequest = isMedicalDevice(productType);
+
+  let validatedPrescription: ValidatedPrescriptionUpload | null = null;
+  if (prescriptionFile) {
+    const validation = await validatePrescriptionUpload(prescriptionFile);
+    if (!validation.ok) {
+      return NextResponse.json({ error: validation.error }, { status: 400 });
+    }
+    validatedPrescription = validation.value;
+  }
+
+  if (!payload.customer || (!deviceRequest && !validatedPrescription)) {
+    return NextResponse.json({ error: deviceRequest ? "La solicitud está incompleta." : "Adjunta la receta médica." }, { status: 400 });
+  }
+
+  let medications: ReturnType<typeof parseMedicationItems> = [];
+  let medicalDevices: ReturnType<typeof parseMedicalDeviceItems> = [];
+  try {
+    if (deviceRequest) medicalDevices = parseMedicalDeviceItems(payload.medicalDevices);
+    else medications = parseMedicationItems(payload.medications);
+  } catch (validationError) {
+    return NextResponse.json({ error: validationError instanceof Error ? validationError.message : "La solicitud está incompleta." }, { status: 400 });
   }
 
   if (shouldUseJsonStorage()) {
@@ -266,28 +286,41 @@ export async function POST(request: Request) {
       patientRut: payload.patient?.rut || null,
       status: "RECEIVED" as const,
       origin,
+      productType,
       price: null,
       acceptsPolicies: payload.acceptsPolicies,
       acceptsDataTreatment: payload.acceptsDataTreatment,
       createdAt: now,
       updatedAt: now,
       customer: null,
-      prescription: {
-        id: `dev-prescription-${Date.now()}`,
-        requestId,
-        fileName: payload.prescription.fileName,
-        mimeType: payload.prescription.mimeType,
-        fileSize: payload.prescription.fileSize,
-        storageKey: null,
-        createdAt: now,
-      },
-      medications: payload.medications.map((medication, index) => ({
+      prescription: validatedPrescription
+        ? {
+            id: `dev-prescription-${Date.now()}`,
+            requestId,
+            fileName: validatedPrescription.fileName,
+            mimeType: validatedPrescription.mimeType,
+            fileSize: validatedPrescription.buffer.length,
+            storageKey: null,
+            createdAt: now,
+          }
+        : null,
+      medications: medications.map((medication, index) => ({
         id: `dev-med-${Date.now()}-${index}`,
         requestId,
         commercialName: medication.commercialName,
         activeIngredient: medication.activeIngredient,
         concentration: medication.concentration,
         tabletQuantity: medication.tabletQuantity,
+        createdAt: now,
+      })),
+      medicalDevices: medicalDevices.map((device, index) => ({
+        id: `dev-device-${Date.now()}-${index}`,
+        requestId,
+        name: device.name,
+        brand: device.brand,
+        model: device.model,
+        quantity: device.quantity,
+        description: device.description,
         createdAt: now,
       })),
       events: [{
@@ -312,7 +345,8 @@ export async function POST(request: Request) {
       payload.customer.name,
       payload.customer.email,
       requestNumber,
-      payload.medications.length,
+      deviceRequest ? medicalDevices.length : medications.length,
+      productType,
     );
 
     return NextResponse.json({
@@ -355,12 +389,13 @@ export async function POST(request: Request) {
         patientName: payload.patient?.name || null,
         patientRut: payload.patient?.rut || null,
         origin,
+        productType,
         acceptsPolicies: payload.acceptsPolicies,
         acceptsDataTreatment: payload.acceptsDataTreatment,
-        prescriptions: { create: payload.prescription },
-        medications: { create: payload.medications },
+        medications: medications.length ? { create: medications } : undefined,
+        medicalDevices: medicalDevices.length ? { create: medicalDevices } : undefined,
       },
-      select: { sequence: true, id: true, status: true, createdAt: true },
+      select: { sequence: true, id: true, status: true, createdAt: true, customerId: true },
     });
 
     const request = await transaction.quoteRequest.update({
@@ -384,6 +419,27 @@ export async function POST(request: Request) {
     return request;
   });
 
+  if (validatedPrescription) {
+    try {
+      await savePrescriptionForRequest({
+        requestId: quoteRequest.id,
+        customerId: quoteRequest.customerId,
+        fileName: validatedPrescription.fileName,
+        buffer: validatedPrescription.buffer,
+        mimeType: validatedPrescription.mimeType,
+        extension: validatedPrescription.extension,
+      });
+    } catch (uploadError) {
+      const storageRoot = process.env.AXESSIA_STORAGE_ROOT?.trim() || (process.env.NODE_ENV === "production" ? "/home/axessia/storage/axessia" : "storage/axessia (relativo al cwd)");
+      console.error("Error storing prescription for quote request:", uploadError, { storageRoot });
+      await prisma.quoteRequest.delete({ where: { id: quoteRequest.id } }).catch(() => undefined);
+      return NextResponse.json(
+        { error: "No fue posible guardar la receta adjunta. Intenta nuevamente." },
+        { status: 500 },
+      );
+    }
+  }
+
   // Send emails asynchronously (fire-and-forget)
   // These run after the database transaction succeeds, ensuring the request ID exists
   const recipient = quoteRequest.customer ?? { name: payload.customer.name, email: payload.customer.email };
@@ -396,7 +452,8 @@ export async function POST(request: Request) {
     recipient.name,
     recipient.email,
     quoteRequest.requestNumber ?? "Sin número",
-    payload.medications.length,
+    deviceRequest ? medicalDevices.length : medications.length,
+    productType,
   );
 
   return NextResponse.json(quoteRequest, { status: 201 });

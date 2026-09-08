@@ -27,26 +27,12 @@ function FacebookIcon({ size = 19 }: { size?: number }) {
 
 const navigation = [
   ["Inicio", "/"],
-  ["Cómo funciona", "/como-funciona"],
-  ["Importación para uso personal", "/soluciones"],
-  ["Seguimiento de solicitud", "/seguimiento"],
-  ["Preguntas frecuentes", "/preguntas-frecuentes"],
+  ["Nosotros", "/nosotros"],
+  ["Seguimiento", "/seguimiento"],
   ["Contacto", "/contacto"],
-];
-
-const services = [
-  "Búsqueda de soluciones",
-  "Acceso internacional",
-  "Importación de medicamentos",
-  "Segunda opinión médica",
-  "Acompañamiento experto.",
-];
-
-const information = [
-  ["Quiénes somos", "/nosotros"],
-  ["Términos y condiciones", "/politicas"],
-  ["Política de privacidad", "/politicas"],
-  ["Aviso legal", "/politicas"],
+  ["Ingresar", "/ingresar"],
+  ["Términos y Condiciones", "/terminos"],
+  ["Política de Privacidad", "/privacidad"],
 ];
 
 const partners = [
@@ -61,7 +47,7 @@ const reveal = {
   visible: { opacity: 1, y: 0, transition: { duration: 0.45 } },
 };
 
-export default function Footer() {
+export default function Footer({ legalRut }: { legalRut?: string }) {
   const pathname = usePathname();
 
   // No mostrar Footer en sistema privado (/app)
@@ -73,7 +59,9 @@ export default function Footer() {
     <footer className="site-footer">
       <div className="site-footer-main">
         <motion.div className="footer-brand" initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} variants={reveal}>
-          <Link href="/" className="footer-logo">AXESSIA</Link>
+          <Link href="/" className="footer-logo"
+          ><img src="/images/logo-axessia.png" alt="AXESSIA" width={150} height={150} />
+          </Link>
           <p>Acceso inteligente a soluciones de salud.</p>
           <div className="footer-socials" aria-label="Redes sociales">
             <a href="https://www.instagram.com/axessia.cl/" target="_blank" rel="noreferrer" aria-label="Instagram AXESSIA"><InstagramIcon /></a>
@@ -83,8 +71,6 @@ export default function Footer() {
         </motion.div>
 
         <FooterColumn title="Navegación" items={navigation} />
-        <FooterColumn title="Servicios" items={services.map((item) => [item, "/soluciones"])} />
-        <FooterColumn title="Información" items={information} />
 
         <motion.div className="footer-contact" initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} variants={reveal}>
           <h2>Contacto</h2>
@@ -147,8 +133,11 @@ export default function Footer() {
       </div>
 
       <div className="footer-bottom">
-        <span>© {new Date().getFullYear()} AXESSIA</span>
-        <span>Información y canales oficiales disponibles próximamente.</span>
+        <span>© {new Date().getFullYear()} AXESSIA{legalRut ? ` · RUT ${legalRut}` : ""}</span>
+        <a className="footer-credit" href="https://www.smartpro.cl" target="_blank" rel="noreferrer">
+          Creado por
+          <Image src="/images/OperationsProcess-section/logo-smartpro.webp" alt="Smartpro" width={140} height={36} />
+        </a>
       </div>
     </footer>
   );

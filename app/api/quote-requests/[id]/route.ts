@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { serializeDocumentMeta } from "@/lib/documents/file-service";
 import { readDevQuoteRequests, readDevQuotes, shouldUseJsonStorage, writeDevQuoteRequests } from "@/lib/dev-request-store";
 import { getInternalActor } from "@/lib/internal-access";
 
@@ -34,6 +35,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
         clientDocuments: { orderBy: { createdAt: "desc" } },
         generatedMandate: true,
         medications: true,
+        medicalDevices: true,
         internalNotes: { orderBy: { createdAt: "desc" } },
         events: { orderBy: { createdAt: "desc" } },
         quotes: { orderBy: { version: "desc" }, include: { items: true } },
@@ -45,11 +47,14 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: "Solicitud no encontrada" }, { status: 404 });
     }
 
+    const { prescriptions, clientDocuments, quotes, ...requestData } = request;
+
     return NextResponse.json({
-      ...request,
-      prescription: request.prescriptions[0] ?? null,
+      ...requestData,
+      prescription: prescriptions[0] ? serializeDocumentMeta(prescriptions[0]) : null,
+      clientDocuments: clientDocuments.map(serializeDocumentMeta),
       internalNotes: request.internalNotes,
-      quotes: request.quotes.map((quote) => ({
+      quotes: quotes.map((quote) => ({
         ...quote,
         total: quote.total?.toString() ?? null,
         validUntil: quote.validUntil?.toISOString() ?? null,

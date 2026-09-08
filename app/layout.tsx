@@ -3,6 +3,7 @@ import { Montserrat, Plus_Jakarta_Sans } from "next/font/google";
 import Navbar from "@/components/Navbar";
 import { QuoteModalProvider } from "@/components/QuoteModal";
 import Footer from "@/components/Footer";
+import { getAxessiaLegalDetails } from "@/lib/axessia-legal";
 import "./globals.css";
 
 const montserrat = Montserrat({
@@ -53,7 +54,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <QuoteModalProvider>
             <Navbar />
             {children}
-            <Footer />
+            <Footer legalRut={getAxessiaLegalDetails()?.legalRut} />
           </QuoteModalProvider>
       </body>
     </html>

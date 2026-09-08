@@ -19,12 +19,17 @@ export function getAppUrl(): string {
 // Initialize Resend only if API key is available
 // If not configured, emails will be skipped gracefully
 let resend: Resend | null = null;
-if (process.env.RESEND_API_KEY && process.env.RESEND_API_KEY.trim()) {
-  resend = new Resend(process.env.RESEND_API_KEY);
+
+function getResendClient() {
+  if (resend) return resend;
+  const apiKey = process.env.RESEND_API_KEY?.trim();
+  if (!apiKey) return null;
+  resend = new Resend(apiKey);
+  return resend;
 }
 
 export function isEmailDeliveryConfigured() {
-  return resend !== null;
+  return getResendClient() !== null;
 }
 
 export type EmailType = "quote_request_received" | "quote_ready" | "quote_accepted" | "quote_rejected";
@@ -34,7 +39,7 @@ interface SendEmailParams {
   subject: string;
   html: string;
   replyTo?: string;
-  attachments?: Array<{ filename: string; content: Buffer }>;
+  attachments?: Array<{ filename: string; content: Buffer; contentType?: string }>;
 }
 
 /**
@@ -67,35 +72,44 @@ export async function sendEmailAwaited(params: SendEmailParams): Promise<void> {
  * Should not be called directly - use sendEmail() instead
  */
 async function sendEmailAsync(params: SendEmailParams): Promise<void> {
-  if (!resend) {
-    console.warn("[Email] RESEND_API_KEY not configured. Email not sent to:", params.to);
-    return;
+  const client = getResendClient();
+  if (!client) {
+    throw new Error("El envío de correo no está configurado.");
   }
 
-  try {
-    await resend.emails.send({
-      from: `AXESSIA <${AXESSIA_EMAIL}>`,
+  const { data, error } = await client.emails.send({
+    from: `AXESSIA <${AXESSIA_EMAIL}>`,
+    to: params.to,
+    subject: params.subject,
+    html: params.html,
+    replyTo: params.replyTo,
+    attachments: params.attachments,
+  });
+
+  if (error) {
+    console.error("[Email] Resend rejected email:", {
       to: params.to,
       subject: params.subject,
-      html: params.html,
-      replyTo: params.replyTo,
-      attachments: params.attachments,
+      error: error.message,
     });
-
-    console.log("[Email] Successfully sent email to:", params.to);
-  } catch (error) {
-    // Errors are already logged by sendEmail caller
-    throw error;
+    throw new Error(error.message || "No fue posible enviar el correo.");
   }
+
+  console.log("[Email] Successfully sent email to:", params.to, data?.id);
 }
 
 export async function sendMandateEmail(customerEmail: string, customerName: string, requestNumber: string, fileName: string, pdf: Uint8Array): Promise<void> {
   if (!isEmailDeliveryConfigured()) throw new Error("El envío de correo no está configurado.");
+  const recipient = customerEmail.trim();
+  if (!/^\S+@\S+\.\S+$/.test(recipient)) throw new Error("El correo del cliente no es válido para enviar el mandato.");
+  const content = Buffer.from(pdf);
+  if (!content.length) throw new Error("No fue posible generar el PDF del mandato.");
   await sendEmailAwaited({
-    to: customerEmail,
+    to: recipient,
     subject: `Mandato para firma y notarización - ${requestNumber}`,
     html: `<p>Hola ${customerName},</p><p>Adjuntamos el mandato AXESSIA asociado a tu solicitud ${requestNumber}. Revísalo, fírmalo y realiza la gestión notarial que corresponda. Luego, devuélvelo a AXESSIA por los canales indicados.</p><p>Saludos,<br />Equipo AXESSIA</p>`,
-    attachments: [{ filename: fileName, content: Buffer.from(pdf) }],
+    replyTo: EMAIL_FORM,
+    attachments: [{ filename: fileName, content, contentType: "application/pdf" }],
   });
 }
 
@@ -153,13 +167,15 @@ export async function sendInternalQuoteRequestNotification(
   customerName: string,
   customerEmail: string,
   requestNumber: string,
-  medicationCount: number,
+  productCount: number,
+  productType: "MEDICATION" | "MEDICAL_DEVICE" = "MEDICATION",
 ): Promise<void> {
   const html = generateInternalQuoteRequestEmail({
     customerName,
     customerEmail,
     requestNumber,
-    medicationCount,
+    productCount,
+    productType,
   });
 
   await sendEmail({
@@ -178,6 +194,7 @@ export async function sendContactMessageEmail(params: {
   name: string;
   email: string;
   phone: string;
+  motive: string;
   subject: string;
   message: string;
 }): Promise<void> {
@@ -185,7 +202,7 @@ export async function sendContactMessageEmail(params: {
 
   await sendEmailAwaited({
     to: EMAIL_FORM,
-    subject: `Nuevo mensaje de contacto: ${params.subject}`,
+    subject: `Nuevo mensaje de contacto (${params.motive}): ${params.subject}`,
     html,
     replyTo: params.email,
   });
@@ -318,7 +335,7 @@ function generateQuoteRequestReceivedEmail({
 
           <div class="message">
             <p><strong>¿Cuál es el siguiente paso?</strong></p>
-            <p>Nuestro equipo de especialistas revisará tu solicitud y los medicamentos requeridos. Nos contactaremos contigo en breve con una cotización personalizada y las opciones disponibles.</p>
+            <p>Nuestro equipo de especialistas revisará tu solicitud y los productos requeridos. Nos contactaremos contigo en breve con una cotización personalizada y las opciones disponibles.</p>
           </div>
 
           <div style="text-align: center;">
@@ -515,12 +532,14 @@ function generateInternalQuoteRequestEmail({
   customerName,
   customerEmail,
   requestNumber,
-  medicationCount,
+  productCount,
+  productType,
 }: {
   customerName: string;
   customerEmail: string;
   requestNumber: string;
-  medicationCount: number;
+  productCount: number;
+  productType: "MEDICATION" | "MEDICAL_DEVICE";
 }): string {
   const appUrl = getAppUrl();
 
@@ -626,8 +645,8 @@ function generateInternalQuoteRequestEmail({
           </div>
 
           <div class="detail-row">
-            <div class="detail-label">Medicamentos:</div>
-            <div class="detail-value">${medicationCount} medicamento(s)</div>
+            <div class="detail-label">${productType === "MEDICAL_DEVICE" ? "Dispositivos:" : "Medicamentos:"}</div>
+            <div class="detail-value">${productCount} ${productType === "MEDICAL_DEVICE" ? "dispositivo(s)" : "medicamento(s)"}</div>
           </div>
 
           <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #DCE4ED;">
@@ -651,12 +670,14 @@ function generateContactMessageEmail({
   name,
   email,
   phone,
+  motive,
   subject,
   message,
 }: {
   name: string;
   email: string;
   phone: string;
+  motive: string;
   subject: string;
   message: string;
 }): string {
@@ -769,6 +790,11 @@ function generateContactMessageEmail({
           <div class="detail-row">
             <div class="detail-label">Teléfono:</div>
             <div class="detail-value">${escapeHtml(phone)}</div>
+          </div>
+
+          <div class="detail-row">
+            <div class="detail-label">Motivo:</div>
+            <div class="detail-value">${escapeHtml(motive)}</div>
           </div>
 
           <div class="message-box">${escapeHtml(message)}</div>

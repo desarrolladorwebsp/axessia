@@ -2,9 +2,10 @@
 
 import { useState } from "react";
 import { FileText, Loader2, Upload } from "lucide-react";
+import { storedFileApiPath } from "@/lib/documents/urls";
 import { PrimaryButton } from "../../components/Buttons";
 
-type ClientDocument = { id: string; fileName: string; mimeType: string; fileSize: number; createdAt: string };
+type ClientDocument = { id: string; fileName: string; mimeType: string; fileSize: number; createdAt: string; hasStoredFile?: boolean };
 
 type GeneratedMandate = { fileName: string; sentAt: string | null } | null;
 
@@ -23,10 +24,11 @@ export default function ClientDocumentsCard({ requestId, initialDocuments, gener
     try {
       setIsSaving(true);
       setError("");
+      const formData = new FormData();
+      formData.append("file", file);
       const response = await fetch(`/api/quote-requests/${requestId}/documents`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ fileName: file.name, mimeType: file.type || "application/octet-stream", fileSize: file.size }),
+        body: formData,
       });
       const result = (await response.json()) as ClientDocument & { error?: string };
       if (!response.ok) throw new Error(result.error || "No fue posible asociar el documento.");
@@ -51,7 +53,7 @@ export default function ClientDocumentsCard({ requestId, initialDocuments, gener
       </div>
       {error && <p className="mt-3 text-xs font-semibold text-rose-600">{error}</p>}
       {generatedMandate && <a href={`/api/mandates/${requestId}/pdf`} target="_blank" rel="noreferrer" className="mt-4 flex items-center gap-3 rounded-xl border border-[var(--blue)]/20 bg-blue-50/50 p-3 transition hover:border-[var(--blue)]"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white text-[var(--blue)]"><FileText className="h-4 w-4" /></span><span className="min-w-0"><strong className="block truncate text-xs text-[var(--navy)]">{generatedMandate.fileName}</strong><span className="mt-0.5 block text-[10px] text-[var(--text-secondary)]">Mandato generado{generatedMandate.sentAt ? ` y enviado el ${new Date(generatedMandate.sentAt).toLocaleDateString("es-CL")}` : ""}</span></span></a>}
-      {documents.length > 0 && <ul className="mt-4 divide-y divide-[var(--border)]">{documents.map((document) => <li key={document.id} className="flex items-center gap-3 py-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--purple)]/10 text-[var(--purple)]"><FileText className="h-4 w-4" /></span><div className="min-w-0"><p className="truncate text-xs font-bold text-[var(--navy)]">{document.fileName}</p><p className="mt-0.5 text-[10px] text-[var(--text-secondary)]">{document.mimeType} · {(document.fileSize / 1024).toFixed(1)} KB · {new Date(document.createdAt).toLocaleDateString("es-CL")}</p></div></li>)}</ul>}
+      {documents.length > 0 && <ul className="mt-4 divide-y divide-[var(--border)]">{documents.map((document) => <li key={document.id} className="flex items-center gap-3 py-3"><span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--purple)]/10 text-[var(--purple)]"><FileText className="h-4 w-4" /></span><div className="min-w-0 flex-1"><p className="truncate text-xs font-bold text-[var(--navy)]">{document.fileName}</p><p className="mt-0.5 text-[10px] text-[var(--text-secondary)]">{document.mimeType} · {(document.fileSize / 1024).toFixed(1)} KB · {new Date(document.createdAt).toLocaleDateString("es-CL")}</p></div>{document.hasStoredFile ? <a href={storedFileApiPath("client-documents", document.id)} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-xs font-bold text-[var(--blue)] transition hover:border-[var(--blue)]">Ver</a> : null}</li>)}</ul>}
     </section>
   );
 }

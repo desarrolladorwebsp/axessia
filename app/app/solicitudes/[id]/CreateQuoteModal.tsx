@@ -5,15 +5,22 @@ import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, CheckCircle2, Loader2, Plus, Send, Trash2 } from "lucide-react";
 import Modal from "../../components/Modal";
 import { PrimaryButton, SecondaryButton } from "../../components/Buttons";
+import { defaultQuoteValidUntilDate, formatLocalDate } from "@/lib/quote-items";
+import { isMedicalDevice, type ProductType } from "@/lib/product-type";
 import type { QuoteDetail } from "./ViewQuoteModal";
 
 type MedicationSeed = { commercialName: string; activeIngredient: string; concentration: string; tabletQuantity: number };
+type DeviceSeed = { name: string; brand: string | null; model: string | null; quantity: number | null; description: string | null };
 
 export type QuoteDraftItem = {
+  productType: ProductType;
   productName: string;
   activeIngredient: string;
   concentration: string;
   pharmaceuticalForm: string;
+  brand: string;
+  model: string;
+  description: string;
   presentation: string;
   unitsPerPackage: string;
   manufacturer: string;
@@ -27,23 +34,31 @@ export type QuoteDraftItem = {
   unitPrice: string;
 };
 
-const emptyItem = (seed?: MedicationSeed): QuoteDraftItem => ({
-  productName: seed?.commercialName ?? "",
-  activeIngredient: seed?.activeIngredient ?? "",
-  concentration: seed?.concentration ?? "",
-  pharmaceuticalForm: "",
-  presentation: "",
-  unitsPerPackage: seed ? String(seed.tabletQuantity) : "",
-  manufacturer: "",
-  originCountry: "",
-  supplierCountry: "",
-  quantity: "1",
-  sanitaryRegistry: "",
-  condition: "",
-  batchNumber: "",
-  expirationDate: "",
-  unitPrice: "",
-});
+const emptyItem = (productType: ProductType, seed?: MedicationSeed | DeviceSeed): QuoteDraftItem => {
+  const deviceSeed = seed && "name" in seed ? seed : null;
+  const medicationSeed = seed && "commercialName" in seed ? seed : null;
+  return {
+    productType,
+    productName: deviceSeed?.name ?? medicationSeed?.commercialName ?? "",
+    activeIngredient: medicationSeed?.activeIngredient ?? "",
+    concentration: medicationSeed?.concentration ?? "",
+    pharmaceuticalForm: "",
+    brand: deviceSeed?.brand ?? "",
+    model: deviceSeed?.model ?? "",
+    description: deviceSeed?.description ?? "",
+    presentation: "",
+    unitsPerPackage: medicationSeed ? String(medicationSeed.tabletQuantity) : "",
+    manufacturer: deviceSeed?.brand ?? "",
+    originCountry: "",
+    supplierCountry: "",
+    quantity: deviceSeed?.quantity != null ? String(deviceSeed.quantity) : "1",
+    sanitaryRegistry: "",
+    condition: "",
+    batchNumber: "",
+    expirationDate: "",
+    unitPrice: "",
+  };
+};
 
 const pharmaceuticalForms = ["Comprimido", "Cápsula", "Ampolla", "Solución", "Jarabe", "Crema", "Otro"];
 
@@ -52,7 +67,9 @@ export default function CreateQuoteModal({
   onClose,
   requestId,
   customerName,
+  productType,
   medications,
+  medicalDevices,
   editingQuote = null,
   onCreated,
 }: {
@@ -60,13 +77,17 @@ export default function CreateQuoteModal({
   onClose: () => void;
   requestId: string;
   customerName: string;
+  productType: ProductType;
   medications: MedicationSeed[];
+  medicalDevices: DeviceSeed[];
   editingQuote?: QuoteDetail | null;
   onCreated: (quote: QuoteDetail) => void;
 }) {
   const isEditing = Boolean(editingQuote);
-  const [items, setItems] = useState<QuoteDraftItem[]>([emptyItem()]);
+  const deviceQuote = isMedicalDevice(productType);
+  const [items, setItems] = useState<QuoteDraftItem[]>([emptyItem(productType)]);
   const [validUntil, setValidUntil] = useState("");
+  const [estimatedShippingDays, setEstimatedShippingDays] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
@@ -80,14 +101,16 @@ export default function CreateQuoteModal({
 
   useEffect(() => {
     if (!open) return;
-    const defaultDate = new Date();
-    defaultDate.setDate(defaultDate.getDate() + 7);
     const seededItems: QuoteDraftItem[] = editingQuote
       ? editingQuote.items.map((item) => ({
+          productType: item.productType ?? productType,
           productName: item.productName,
           activeIngredient: item.activeIngredient ?? "",
           concentration: item.concentration ?? "",
           pharmaceuticalForm: item.pharmaceuticalForm ?? "",
+          brand: item.brand ?? "",
+          model: item.model ?? "",
+          description: item.description ?? "",
           presentation: item.presentation ?? "",
           unitsPerPackage: item.unitsPerPackage != null ? String(item.unitsPerPackage) : "",
           manufacturer: item.manufacturer ?? "",
@@ -100,12 +123,14 @@ export default function CreateQuoteModal({
           expirationDate: item.expirationDate ? item.expirationDate.slice(0, 10) : "",
           unitPrice: item.unitPrice != null ? String(item.unitPrice) : "",
         }))
-      : medications.length
-        ? medications.map((medication) => emptyItem(medication))
-        : [emptyItem()];
-    const defaultValidUntil = editingQuote?.validUntil ? editingQuote.validUntil.slice(0, 10) : defaultDate.toISOString().slice(0, 10);
+      : deviceQuote
+        ? (medicalDevices.length ? medicalDevices.map((device) => emptyItem("MEDICAL_DEVICE", device)) : [emptyItem("MEDICAL_DEVICE")])
+        : (medications.length ? medications.map((medication) => emptyItem("MEDICATION", medication)) : [emptyItem("MEDICATION")]);
+    const defaultValidUntil = editingQuote?.validUntil ? editingQuote.validUntil.slice(0, 10) : defaultQuoteValidUntilDate();
+    const defaultShippingDays = editingQuote?.estimatedShippingDays != null ? String(editingQuote.estimatedShippingDays) : "";
     // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the draft form each time the modal opens
     setValidUntil(defaultValidUntil);
+    setEstimatedShippingDays(defaultShippingDays);
     setItems(seededItems);
     setError("");
     setShowDiscardConfirm(false);
@@ -113,18 +138,18 @@ export default function CreateQuoteModal({
     setConfirmStage("idle");
     setConfirmError("");
     setCreatedQuote(null);
-    initialSnapshot.current = JSON.stringify({ items: seededItems, validUntil: defaultValidUntil });
-  }, [open, medications, editingQuote]);
+    initialSnapshot.current = JSON.stringify({ items: seededItems, validUntil: defaultValidUntil, estimatedShippingDays: defaultShippingDays });
+  }, [open, productType, medications, medicalDevices, editingQuote, deviceQuote]);
 
   const updateItem = (index: number, patch: Partial<QuoteDraftItem>) => {
     setItems((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)));
   };
 
-  const addItem = () => setItems((current) => [...current, emptyItem()]);
+  const addItem = () => setItems((current) => [...current, emptyItem(productType)]);
   const removeItem = (index: number) => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
 
   const total = items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0);
-  const isDirty = () => JSON.stringify({ items, validUntil }) !== initialSnapshot.current;
+  const isDirty = () => JSON.stringify({ items, validUntil, estimatedShippingDays }) !== initialSnapshot.current;
   const isBusy = confirmStage === "creating" || confirmStage === "sending";
 
   const requestClose = () => {
@@ -138,7 +163,10 @@ export default function CreateQuoteModal({
 
   const validateItemsForFinalize = () => {
     const invalidItem = items.find((item) => !item.productName.trim() || !Number(item.quantity) || Number(item.quantity) <= 0 || item.unitPrice === "" || Number(item.unitPrice) < 0);
-    return invalidItem ? "Completa nombre comercial, cantidad solicitada y precio unitario en todos los productos" : "";
+    if (invalidItem) return "Completa nombre comercial, cantidad solicitada y precio unitario en todos los productos";
+    const days = Number(estimatedShippingDays);
+    if (!estimatedShippingDays || !Number.isInteger(days) || days <= 0) return "Indica el tiempo estimado de envío en días hábiles";
+    return "";
   };
 
   const buildItemsPayload = () =>
@@ -156,7 +184,13 @@ export default function CreateQuoteModal({
     const response = await fetch(endpoint, {
       method: isEditing ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ requestId, validUntil: validUntil || null, asDraft, items: buildItemsPayload() }),
+      body: JSON.stringify({
+        requestId,
+        validUntil: validUntil || null,
+        estimatedShippingDays: estimatedShippingDays === "" ? null : Number(estimatedShippingDays),
+        asDraft,
+        items: buildItemsPayload(),
+      }),
     });
     const result = (await response.json()) as { error?: string } & Partial<QuoteDetail>;
     if (!response.ok) throw new Error(result.error || (isEditing ? "No fue posible guardar los cambios" : "No fue posible guardar la cotización"));
@@ -333,18 +367,36 @@ export default function CreateQuoteModal({
         )}
       </AnimatePresence>
 
-      <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <p className="text-xs font-semibold text-[var(--text-secondary)]">{items.length} producto{items.length === 1 ? "" : "s"} en esta cotización</p>
-        <label className="text-xs font-bold text-[var(--navy)]">
-          Vence
-          <input
-            type="date"
-            value={validUntil}
-            min={new Date().toISOString().slice(0, 10)}
-            onChange={(event) => setValidUntil(event.target.value)}
-            className="mt-1 block rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-xs font-semibold outline-none focus:border-[var(--blue)]"
-          />
-        </label>
+        <div className="flex flex-wrap items-end gap-3">
+          <label className="text-xs font-bold text-[var(--navy)]">
+            Tiempo estimado de envío
+            <span className="mt-1 flex items-center gap-2">
+              <input
+                type="number"
+                min="1"
+                max="365"
+                step="1"
+                value={estimatedShippingDays}
+                onChange={(event) => setEstimatedShippingDays(event.target.value)}
+                placeholder="Ej: 10"
+                className="block w-24 rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-xs font-semibold outline-none focus:border-[var(--blue)]"
+              />
+              <span className="whitespace-nowrap text-[10px] font-semibold text-[var(--text-secondary)]">días hábiles</span>
+            </span>
+          </label>
+          <label className="text-xs font-bold text-[var(--navy)]">
+            Vence
+            <input
+              type="date"
+              value={validUntil}
+              min={formatLocalDate(new Date())}
+              onChange={(event) => setValidUntil(event.target.value)}
+              className="mt-1 block rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-xs font-semibold outline-none focus:border-[var(--blue)]"
+            />
+          </label>
+        </div>
       </div>
 
       <div className="space-y-4">
@@ -369,31 +421,55 @@ export default function CreateQuoteModal({
               </div>
 
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <Field label="Nombre comercial">
+                <Field label={deviceQuote ? "Nombre del dispositivo" : "Nombre comercial"}>
                   <input value={item.productName} onChange={(event) => updateItem(index, { productName: event.target.value })} className="field-input" />
                 </Field>
-                <Field label="Principio activo">
-                  <input value={item.activeIngredient} onChange={(event) => updateItem(index, { activeIngredient: event.target.value })} className="field-input" />
-                </Field>
-                <Field label="Concentración">
-                  <input value={item.concentration} onChange={(event) => updateItem(index, { concentration: event.target.value })} className="field-input" />
-                </Field>
-                <Field label="Forma farmacéutica">
-                  <select value={item.pharmaceuticalForm} onChange={(event) => updateItem(index, { pharmaceuticalForm: event.target.value })} className="field-input">
-                    <option value="">Seleccionar</option>
-                    {pharmaceuticalForms.map((form) => <option key={form} value={form}>{form}</option>)}
-                  </select>
-                </Field>
+                {deviceQuote ? (
+                  <>
+                    <Field label="Marca">
+                      <input value={item.brand} onChange={(event) => updateItem(index, { brand: event.target.value, manufacturer: event.target.value || item.manufacturer })} className="field-input" />
+                    </Field>
+                    <Field label="Modelo o referencia">
+                      <input value={item.model} onChange={(event) => updateItem(index, { model: event.target.value })} className="field-input" />
+                    </Field>
+                    <Field label="Fabricante">
+                      <input value={item.manufacturer} onChange={(event) => updateItem(index, { manufacturer: event.target.value })} className="field-input" />
+                    </Field>
+                  </>
+                ) : (
+                  <>
+                    <Field label="Principio activo">
+                      <input value={item.activeIngredient} onChange={(event) => updateItem(index, { activeIngredient: event.target.value })} className="field-input" />
+                    </Field>
+                    <Field label="Concentración">
+                      <input value={item.concentration} onChange={(event) => updateItem(index, { concentration: event.target.value })} className="field-input" />
+                    </Field>
+                    <Field label="Forma farmacéutica">
+                      <select value={item.pharmaceuticalForm} onChange={(event) => updateItem(index, { pharmaceuticalForm: event.target.value })} className="field-input">
+                        <option value="">Seleccionar</option>
+                        {pharmaceuticalForms.map((form) => <option key={form} value={form}>{form}</option>)}
+                      </select>
+                    </Field>
+                  </>
+                )}
 
-                <Field label="Presentación">
-                  <input value={item.presentation} onChange={(event) => updateItem(index, { presentation: event.target.value })} placeholder="Caja de 30 comprimidos" className="field-input" />
-                </Field>
-                <Field label="Unidades por presentación">
-                  <input type="number" min="1" value={item.unitsPerPackage} onChange={(event) => updateItem(index, { unitsPerPackage: event.target.value })} placeholder="30" className="field-input" />
-                </Field>
-                <Field label="Laboratorio / fabricante">
-                  <input value={item.manufacturer} onChange={(event) => updateItem(index, { manufacturer: event.target.value })} className="field-input" />
-                </Field>
+                {deviceQuote ? (
+                  <Field label="Descripción o características">
+                    <input value={item.description} onChange={(event) => updateItem(index, { description: event.target.value })} className="field-input" />
+                  </Field>
+                ) : (
+                  <>
+                    <Field label="Presentación">
+                      <input value={item.presentation} onChange={(event) => updateItem(index, { presentation: event.target.value })} placeholder="Caja de 30 comprimidos" className="field-input" />
+                    </Field>
+                    <Field label="Unidades por presentación">
+                      <input type="number" min="1" value={item.unitsPerPackage} onChange={(event) => updateItem(index, { unitsPerPackage: event.target.value })} placeholder="30" className="field-input" />
+                    </Field>
+                    <Field label="Laboratorio / fabricante">
+                      <input value={item.manufacturer} onChange={(event) => updateItem(index, { manufacturer: event.target.value })} className="field-input" />
+                    </Field>
+                  </>
+                )}
                 <Field label="País de origen">
                   <input value={item.originCountry} onChange={(event) => updateItem(index, { originCountry: event.target.value })} className="field-input" />
                 </Field>
@@ -407,7 +483,7 @@ export default function CreateQuoteModal({
                 <Field label="Condición">
                   <select value={item.condition} onChange={(event) => updateItem(index, { condition: event.target.value as QuoteDraftItem["condition"] })} className="field-input">
                     <option value="">Seleccionar</option>
-                    <option value="AVAILABLE">Medicamento disponible</option>
+                    <option value="AVAILABLE">{deviceQuote ? "Dispositivo disponible" : "Medicamento disponible"}</option>
                     <option value="SPECIAL_IMPORT">Importación especial</option>
                   </select>
                 </Field>

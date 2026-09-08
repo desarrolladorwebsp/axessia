@@ -15,6 +15,7 @@ export type DevQuoteRequestRecord = {
   patientRut: string | null;
   status: "RECEIVED" | "SOURCING" | "QUOTED" | "AWAITING_DECISION" | "ACCEPTED" | "SHIPPING" | "REJECTED" | "CANCELLED" | "COMPLETED";
   origin: "WEB" | "EJECUTIVO";
+  productType?: "MEDICATION" | "MEDICAL_DEVICE";
   price?: number | null;
   acceptsPolicies: boolean;
   acceptsDataTreatment: boolean;
@@ -73,6 +74,16 @@ export type DevQuoteRequestRecord = {
     tabletQuantity: number;
     createdAt: string;
   }>;
+  medicalDevices?: Array<{
+    id: string;
+    requestId: string;
+    name: string;
+    brand: string | null;
+    model: string | null;
+    quantity: number | null;
+    description: string | null;
+    createdAt: string;
+  }>;
   internalNotes?: Array<{
     id: string;
     executiveName: string;
@@ -113,14 +124,19 @@ export type DevQuoteRecord = {
   status: "DRAFT" | "READY" | "SENT" | "ACCEPTED" | "REJECTED" | "EXPIRED" | "VOIDED";
   total: number | null;
   validUntil: string | null;
+  estimatedShippingDays: number | null;
   createdAt: string;
   sentAt: string | null;
   items: Array<{
     id: string;
+    productType?: "MEDICATION" | "MEDICAL_DEVICE";
     productName: string;
     activeIngredient: string | null;
     concentration: string | null;
     pharmaceuticalForm: string | null;
+    brand?: string | null;
+    model?: string | null;
+    description?: string | null;
     presentation: string | null;
     unitsPerPackage: number | null;
     manufacturer: string | null;

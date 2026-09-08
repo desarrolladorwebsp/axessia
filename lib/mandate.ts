@@ -8,7 +8,8 @@ export type MandateRequestData = {
   mandateName: string;
   mandateRut: string;
   condition: string | null;
-  medications: Array<{ commercialName: string; activeIngredient: string }>;
+  productLabel: string;
+  products: Array<{ name: string; detail?: string | null }>;
 };
 
 const navy = rgb(7 / 255, 30 / 255, 65 / 255);
@@ -53,9 +54,9 @@ export async function generateMandatePdf(request: MandateRequestData, company: A
   page.drawLine({ start: { x: margin, y: cursor - 48 }, end: { x: width - margin, y: cursor - 48 }, thickness: 1.5, color: blue });
   cursor -= 78;
 
-  const medicationDescription = request.medications.map((item) => item.activeIngredient ? `${item.commercialName} (${item.activeIngredient})` : item.commercialName).join(", ");
+  const productDescription = request.products.map((item) => item.detail ? `${item.name} (${item.detail})` : item.name).join(", ");
   const conditionText = request.condition ? `, en relación con mi condición de ${request.condition}` : "";
-  const body = `Por medio del presente, yo ${request.mandateName}, RUT ${request.mandateRut}${conditionText}, autorizo a ${company.legalName}, RUT ${company.legalRut}, para que realice en mi representación los trámites necesarios ante el Instituto de Salud Pública y demás organismos que correspondan, relacionados con la gestión del medicamento ${medicationDescription}, conforme a los antecedentes de mi solicitud ${request.requestNumber}.`;
+  const body = `Por medio del presente, yo ${request.mandateName}, RUT ${request.mandateRut}${conditionText}, autorizo a ${company.legalName}, RUT ${company.legalRut}, para que realice en mi representación los trámites necesarios ante el Instituto de Salud Pública y demás organismos que correspondan, relacionados con la gestión del ${request.productLabel} ${productDescription}, conforme a los antecedentes de mi solicitud ${request.requestNumber}.`;
   for (const line of wrap(body, regular, 10.5, width - margin * 2)) {
     page.drawText(line, { x: margin, y: cursor, size: 10.5, font: regular, color: navy });
     cursor -= 16;
@@ -68,7 +69,7 @@ export async function generateMandatePdf(request: MandateRequestData, company: A
     ["Nombre completo", request.mandateName],
     ["RUT", request.mandateRut],
     ["Solicitud", request.requestNumber],
-    ["Medicamento", medicationDescription],
+    [request.productLabel === "dispositivo médico" ? "Dispositivo" : "Medicamento", productDescription],
   ];
   for (const [label, value] of fields) {
     page.drawText(`${label}:`, { x: margin, y: cursor, size: 9.5, font: bold, color: navy });

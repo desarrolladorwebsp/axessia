@@ -14,12 +14,14 @@ import Avatar from "../components/Avatar";
 import { FilterBar, SearchField, FilterSelect } from "../components/FilterBar";
 import Pagination from "../components/Pagination";
 import CreateRequestModal from "./CreateRequestModal";
+import { productTypeLabel, requestPrimaryProductName, requestProductCount, type ProductType } from "@/lib/product-type";
 
 interface QuoteRequestItem {
   id: string;
   requestNumber: string | null;
   status: string;
   origin: string;
+  productType?: ProductType;
   price: number | null;
   createdAt: string;
   requesterName?: string | null;
@@ -27,6 +29,7 @@ interface QuoteRequestItem {
   customer: { name: string; email: string; phone: string } | null;
   assignedExecutive: { id: string; firstName: string; lastName: string } | null;
   medications: Array<{ commercialName: string; activeIngredient: string }>;
+  medicalDevices?: Array<{ name: string }>;
 }
 
 interface PaginationData {
@@ -170,7 +173,7 @@ export default function SolicitudesPage() {
                 <thead>
                   <tr className="border-b border-[var(--border)] bg-[var(--background)]">
                     <th className="w-12 px-4 py-3"><input type="checkbox" aria-label="Seleccionar todas" className="accent-[var(--purple)]" /></th>
-                    {["ID solicitud", "Cliente", "Producto / Medicamento", "Fecha recepción", "Estado actual", "Origen", "Ejecutivo", "Acciones"].map((header) => (
+                    {["ID solicitud", "Cliente", "Producto", "Fecha recepción", "Estado actual", "Origen", "Ejecutivo", "Acciones"].map((header) => (
                       <th key={header} className="px-3 py-3 text-[10px] font-bold uppercase tracking-wide text-[var(--navy)]">
                         {header}<ChevronDown className="ml-1 inline h-3 w-3 text-[var(--text-secondary)]" />
                       </th>
@@ -216,8 +219,8 @@ function RequestRow({ request, index, onOpen }: { request: QuoteRequestItem; ind
         </div>
       </td>
       <td className="px-3 py-4">
-        <p className="text-xs font-bold text-[var(--navy)]">{request.medications[0]?.commercialName || "Sin medicamento"}</p>
-        <p className="mt-1 text-[10px] text-[var(--text-secondary)]">{request.medications.length} medicamento{request.medications.length === 1 ? "" : "s"}</p>
+        <p className="text-xs font-bold text-[var(--navy)]">{requestPrimaryProductName(request)}</p>
+        <p className="mt-1 text-[10px] text-[var(--text-secondary)]">{productTypeLabel(request.productType)} · {requestProductCount(request)}</p>
       </td>
       <td className="px-3 py-4 text-[10px] text-[var(--text-secondary)]">
         {new Date(request.createdAt).toLocaleDateString("es-CL")}<br />
@@ -257,7 +260,7 @@ function MobileRequestCard({ request, index, onOpen }: { request: QuoteRequestIt
         <StatusBadge label={statusLabels[request.status] || request.status} tone={statusTones[request.status]} />
       </div>
       <div className="mt-3 flex justify-between text-[10px] text-[var(--text-secondary)]">
-        <span>{request.medications[0]?.commercialName || "Sin medicamento"}</span>
+        <span>{requestPrimaryProductName(request)}</span>
         <span>{new Date(request.createdAt).toLocaleDateString("es-CL")}</span>
       </div>
       <div className="mt-2"><StatusBadge label={originLabels[request.origin] || request.origin} tone={originTones[request.origin] ?? "neutral"} /></div>

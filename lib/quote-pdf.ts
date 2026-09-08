@@ -1,13 +1,18 @@
 import { promises as fs } from "fs";
 import path from "path";
-import { PDFDocument, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
+import { PDFDocument, PDFString, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import { getAxessiaLegalDetails } from "@/lib/axessia-legal";
+import { formatEstimatedShippingDays } from "@/lib/quote-items";
 
 export type QuotePdfItem = {
+  productType?: "MEDICATION" | "MEDICAL_DEVICE";
   productName: string;
   activeIngredient: string | null;
   concentration: string | null;
   pharmaceuticalForm?: string | null;
+  brand?: string | null;
+  model?: string | null;
+  description?: string | null;
   presentation?: string | null;
   unitsPerPackage?: number | null;
   manufacturer?: string | null;
@@ -28,6 +33,7 @@ export type QuotePdfData = {
   status?: string;
   createdAt: Date;
   validUntil: Date | null;
+  estimatedShippingDays?: number | null;
   total: string | null;
   requestNumber?: string | null;
   customer: {
@@ -122,7 +128,48 @@ function joinParts(parts: Array<string | null | undefined>) {
   return parts.map((part) => part?.trim()).filter((part): part is string => Boolean(part)).join(" · ");
 }
 
+function getPublicAppUrl() {
+  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
+  const raw = configuredUrl || "www.axessia.cl";
+  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+  return withProtocol.replace(/\/$/, "");
+}
+
+function getTermsAndConditionsUrl() {
+  return `${getPublicAppUrl()}/politicas`;
+}
+
+function addUriLink(page: PDFPage, url: string, x: number, y: number, width: number, height: number) {
+  const annotation = page.doc.context.register(
+    page.doc.context.obj({
+      Type: "Annot",
+      Subtype: "Link",
+      Rect: [x, y, x + width, y + height],
+      Border: [0, 0, 0],
+      A: { Type: "Action", S: "URI", URI: PDFString.of(url) },
+    }),
+  );
+  page.node.addAnnot(annotation);
+}
+
 function itemDetailLines(item: QuotePdfItem) {
+  if (item.productType === "MEDICAL_DEVICE") {
+    return [
+      joinParts([item.brand ? `Marca: ${item.brand}` : null, item.model ? `Modelo: ${item.model}` : null]) || "Dispositivo médico",
+      item.description?.trim() || "",
+      joinParts([
+        item.manufacturer ? `Fabricante: ${item.manufacturer}` : null,
+        item.originCountry ? `Origen: ${item.originCountry}` : null,
+        item.supplierCountry ? `Proveedor: ${item.supplierCountry}` : null,
+      ]),
+      joinParts([
+        item.sanitaryRegistry ? `Reg. sanitario: ${item.sanitaryRegistry}` : null,
+        item.condition ? (item.condition === "AVAILABLE" ? "Dispositivo disponible" : conditionLabels[item.condition]) : null,
+        item.batchNumber ? `Lote: ${item.batchNumber}` : null,
+        item.expirationDate ? `Venc. producto: ${formatDate(item.expirationDate)}` : null,
+      ]),
+    ].filter(Boolean);
+  }
   return [
     joinParts([item.activeIngredient, item.concentration]) || "Sin especificación",
     joinParts([
@@ -211,6 +258,7 @@ export async function generateQuotePdf(quote: QuotePdfData) {
     ["Ciudad", quote.customer.city],
   ].filter((row): row is [string, string] => Boolean(row));
 
+  const shippingEstimate = formatEstimatedShippingDays(quote.estimatedShippingDays);
   const quoteLines = [
     ["N° cotización", quote.quoteNumber],
     quote.requestNumber ? ["Solicitud", quote.requestNumber] : null,
@@ -218,6 +266,7 @@ export async function generateQuotePdf(quote: QuotePdfData) {
     quote.status ? ["Estado", quoteStatusLabels[quote.status] || quote.status] : null,
     ["Fecha de emisión", formatDate(quote.createdAt)],
     ["Vigencia", quote.validUntil ? formatDate(quote.validUntil) : "Sin fecha de vencimiento"],
+    shippingEstimate ? ["Envío estimado", shippingEstimate] : null,
   ].filter((row): row is [string, string] => Boolean(row));
 
   const boxGap = 12;
@@ -327,18 +376,35 @@ export async function generateQuotePdf(quote: QuotePdfData) {
 
   const notes = [
     `Vigencia: ${quote.validUntil ? formatDate(quote.validUntil) : "Sin fecha de vencimiento"}`,
+    shippingEstimate ? `Tiempo estimado de envío: ${shippingEstimate}.` : null,
+    "Los tiempos de envío informados son estimados. AXESSIA no se responsabiliza por atrasos ocasionados por factores externos o terceros fuera del control de la empresa.",
     "Documento emitido por AXESSIA. Válido para compartir por medios digitales.",
     company ? `Emisor: ${company.legalName} · RUT ${company.legalRut}` : null,
   ].filter((line): line is string => Boolean(line));
 
+  const termsUrl = getTermsAndConditionsUrl();
+  const termsPrefix = "Términos y condiciones: ";
   const noteLines = notes.flatMap((line) => wrap(line, regular, 8, contentWidth));
-  ensureSpace(22 + noteLines.length * 12);
+  ensureSpace(22 + noteLines.length * 12 + 14);
   page.drawText("CONDICIONES", { x: margin, y, size: 8, font: bold, color: blue });
   y -= 14;
   for (const line of noteLines) {
     page.drawText(line, { x: margin, y, size: 8, font: regular, color: muted });
     y -= 12;
   }
+
+  page.drawText(termsPrefix, { x: margin, y, size: 8, font: regular, color: muted });
+  const termsPrefixWidth = regular.widthOfTextAtSize(termsPrefix, 8);
+  page.drawText(termsUrl, { x: margin + termsPrefixWidth, y, size: 8, font: regular, color: blue });
+  const termsUrlWidth = regular.widthOfTextAtSize(termsUrl, 8);
+  page.drawLine({
+    start: { x: margin + termsPrefixWidth, y: y - 1 },
+    end: { x: margin + termsPrefixWidth + termsUrlWidth, y: y - 1 },
+    thickness: 0.4,
+    color: blue,
+  });
+  addUriLink(page, termsUrl, margin + termsPrefixWidth, y - 2, termsUrlWidth, 11);
+  y -= 12;
 
   const drawHeader = (target: PDFPage) => {
     target.drawRectangle({ x: 0, y: pageHeight - headerHeight, width: pageWidth, height: headerHeight, color: navyDark });

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getAxessiaLegalDetails } from "@/lib/axessia-legal";
 import { readDevQuoteRequests, shouldUseJsonStorage } from "@/lib/dev-request-store";
 import { generateMandatePdf } from "@/lib/mandate";
+import { mandateProductsFromRequest } from "@/lib/product-type";
 import { prisma } from "@/lib/prisma";
 import { getInternalActor } from "@/lib/internal-access";
 
@@ -22,15 +23,15 @@ export async function GET(_request: Request, { params }: RouteContext) {
     if (shouldUseJsonStorage()) {
       const record = (await readDevQuoteRequests()).find((item) => item.id === requestId && item.generatedMandate);
       if (!record?.generatedMandate) return NextResponse.json({ error: "Mandato no encontrado." }, { status: 404 });
-      const pdf = await generateMandatePdf({ requestNumber: record.requestNumber, mandateName: record.patientName || record.requesterName, mandateRut: record.patientRut || record.requesterRut, condition: null, medications: record.medications }, company);
+      const pdf = await generateMandatePdf({ requestNumber: record.requestNumber, mandateName: record.patientName || record.requesterName, mandateRut: record.patientRut || record.requesterRut, condition: null, ...mandateProductsFromRequest(record) }, company);
       return pdfResponse(pdf, record.generatedMandate.fileName);
     }
 
-    const mandate = await prisma.generatedMandate.findUnique({ where: { requestId }, select: { fileName: true, request: { select: { requestNumber: true, requesterName: true, requesterRut: true, patientName: true, patientRut: true, medications: { select: { commercialName: true, activeIngredient: true } } } } } });
+    const mandate = await prisma.generatedMandate.findUnique({ where: { requestId }, select: { fileName: true, request: { select: { requestNumber: true, requesterName: true, requesterRut: true, patientName: true, patientRut: true, productType: true, medications: { select: { commercialName: true, activeIngredient: true } }, medicalDevices: { select: { name: true, brand: true, model: true } } } } } });
     const requestNumber = mandate?.request.requestNumber;
     if (!mandate || !requestNumber) return NextResponse.json({ error: "Mandato no encontrado." }, { status: 404 });
     const request = mandate.request;
-    const pdf = await generateMandatePdf({ requestNumber, mandateName: request.patientName || request.requesterName, mandateRut: request.patientRut || request.requesterRut, condition: null, medications: request.medications }, company);
+    const pdf = await generateMandatePdf({ requestNumber, mandateName: request.patientName || request.requesterName, mandateRut: request.patientRut || request.requesterRut, condition: null, ...mandateProductsFromRequest(request) }, company);
     return pdfResponse(pdf, mandate.fileName);
   } catch (error) {
     console.error("Error generating mandate PDF:", error);

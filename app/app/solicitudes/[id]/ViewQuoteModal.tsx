@@ -2,16 +2,22 @@
 
 import { useState } from "react";
 import { AlertTriangle, Download, Pencil, Send } from "lucide-react";
+import { formatEstimatedShippingDays } from "@/lib/quote-items";
+import { isMedicalDevice, quoteConditionLabel, type ProductType } from "@/lib/product-type";
 import Modal from "../../components/Modal";
 import { PrimaryButton, SecondaryButton } from "../../components/Buttons";
 import StatusBadge, { type StatusTone } from "../../components/StatusBadge";
 
 export type QuoteItemDetail = {
   id: string;
+  productType?: ProductType;
   productName: string;
   activeIngredient: string | null;
   concentration: string | null;
   pharmaceuticalForm: string | null;
+  brand?: string | null;
+  model?: string | null;
+  description?: string | null;
   presentation: string | null;
   unitsPerPackage: number | null;
   manufacturer: string | null;
@@ -33,13 +39,13 @@ export type QuoteDetail = {
   status: string;
   total: string | number | null;
   validUntil: string | null;
+  estimatedShippingDays?: number | null;
   createdAt: string;
   items: QuoteItemDetail[];
 };
 
 export const quoteStatusLabels: Record<string, string> = { DRAFT: "Borrador", READY: "Lista para enviar", SENT: "Enviada", ACCEPTED: "Aceptada", REJECTED: "Rechazada", EXPIRED: "Vencida", VOIDED: "Anulada" };
 export const quoteStatusTones: Record<string, StatusTone> = { DRAFT: "neutral", READY: "warning", SENT: "info", ACCEPTED: "success", REJECTED: "danger", EXPIRED: "warning", VOIDED: "neutral" };
-const conditionLabels: Record<string, string> = { AVAILABLE: "Medicamento disponible", SPECIAL_IMPORT: "Importación especial" };
 const editableStatuses = ["DRAFT", "READY"];
 
 function money(value: string | number | null) {
@@ -69,6 +75,7 @@ export default function ViewQuoteModal({
 
   const canEdit = editableStatuses.includes(quote.status);
   const canSend = quote.status === "READY";
+  const shippingEstimate = formatEstimatedShippingDays(quote.estimatedShippingDays);
 
   const sendQuote = async () => {
     if (isSending) return;
@@ -97,6 +104,7 @@ export default function ViewQuoteModal({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-xs text-[var(--text-secondary)]">
             {quote.validUntil ? `Vigente hasta ${new Date(quote.validUntil).toLocaleDateString("es-CL")}` : "Sin fecha de vigencia"}
+            {shippingEstimate ? ` · Envío estimado: ${shippingEstimate}` : ""}
           </p>
           <div className="flex flex-wrap items-center gap-2">
             {sendError && <p className="text-xs font-semibold text-rose-600">{sendError}</p>}
@@ -133,20 +141,35 @@ export default function ViewQuoteModal({
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
                 <p className="text-sm font-extrabold text-[var(--navy)]">{item.productName}</p>
-                <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{item.activeIngredient || "Principio activo no informado"} {item.concentration ? `· ${item.concentration}` : ""}</p>
+                <p className="mt-0.5 text-xs text-[var(--text-secondary)]">
+                  {isMedicalDevice(item.productType)
+                    ? [item.brand, item.model].filter(Boolean).join(" · ") || item.description || "Dispositivo médico"
+                    : `${item.activeIngredient || "Principio activo no informado"}${item.concentration ? ` · ${item.concentration}` : ""}`}
+                </p>
               </div>
               <p className="text-sm font-extrabold text-[var(--navy)]">{money(item.totalPrice)}</p>
             </div>
 
             <dl className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3 lg:grid-cols-4">
-              <DetailField label="Forma farmacéutica" value={item.pharmaceuticalForm} />
-              <DetailField label="Presentación" value={item.presentation} />
-              <DetailField label="Unidades por presentación" value={item.unitsPerPackage ? String(item.unitsPerPackage) : null} />
-              <DetailField label="Laboratorio / fabricante" value={item.manufacturer} />
+              {isMedicalDevice(item.productType) ? (
+                <>
+                  <DetailField label="Marca" value={item.brand ?? null} />
+                  <DetailField label="Modelo o referencia" value={item.model ?? null} />
+                  <DetailField label="Descripción" value={item.description ?? null} />
+                  <DetailField label="Fabricante" value={item.manufacturer} />
+                </>
+              ) : (
+                <>
+                  <DetailField label="Forma farmacéutica" value={item.pharmaceuticalForm} />
+                  <DetailField label="Presentación" value={item.presentation} />
+                  <DetailField label="Unidades por presentación" value={item.unitsPerPackage ? String(item.unitsPerPackage) : null} />
+                  <DetailField label="Laboratorio / fabricante" value={item.manufacturer} />
+                </>
+              )}
               <DetailField label="País de origen" value={item.originCountry} />
               <DetailField label="País del proveedor" value={item.supplierCountry} />
               <DetailField label="Registro sanitario" value={item.sanitaryRegistry} />
-              <DetailField label="Condición" value={item.condition ? conditionLabels[item.condition] : null} />
+              <DetailField label="Condición" value={quoteConditionLabel(item.condition, item.productType)} />
               <DetailField label="Lote" value={item.batchNumber} />
               <DetailField label="Fecha de vencimiento" value={item.expirationDate ? new Date(item.expirationDate).toLocaleDateString("es-CL") : null} />
               <DetailField label="Cantidad solicitada" value={String(item.quantity)} />

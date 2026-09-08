@@ -2,10 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
-import { CalendarRange, ClipboardList, FileCheck2, LayoutDashboard, ReceiptText } from "lucide-react";
-import { SkeletonCards } from "../components/Skeletons";
+import { BadgeCheck, CalendarRange, ClipboardList, FileCheck2, LayoutDashboard, PackageCheck, ReceiptText, Truck, XCircle } from "lucide-react";
+import type { LucideIcon } from "lucide-react";
 import PageHeader from "../components/PageHeader";
-import MetricCard from "../components/MetricCard";
 
 interface QuoteRequestSummary {
   id: string;
@@ -105,8 +104,69 @@ export default function DashboardPage() {
     cancelled: 0,
     completed: 0,
   };
-  const inManagement = summary.inManagement;
-  const quoted = summary.quoted;
+  const shareOfTotal = (value: number) =>
+    summary.totalRequests > 0 ? `${Math.round((value / summary.totalRequests) * 100)}%` : "0%";
+
+  const volumeKpis: DashboardKpi[] = [
+    {
+      label: "Solicitudes",
+      value: summary.totalRequests,
+      detail: "Recibidas en el período",
+      share: summary.totalRequests > 0 ? "100%" : "0%",
+      icon: FileCheck2,
+      tone: "violet",
+    },
+    {
+      label: "En gestión",
+      value: summary.inManagement,
+      detail: "Pendientes por gestionar",
+      share: shareOfTotal(summary.inManagement),
+      icon: ClipboardList,
+      tone: "amber",
+    },
+    {
+      label: "Cotizaciones realizadas",
+      value: summary.quoted,
+      detail: "Emitidas en el período",
+      icon: ReceiptText,
+      tone: "blue",
+    },
+  ];
+
+  const outcomeKpis: DashboardKpi[] = [
+    {
+      label: "Aceptadas",
+      value: summary.accepted,
+      detail: "Cotización aceptada",
+      share: shareOfTotal(summary.accepted),
+      icon: BadgeCheck,
+      tone: "emerald",
+    },
+    {
+      label: "Rechazadas",
+      value: summary.rejected,
+      detail: "Solicitud rechazada",
+      share: shareOfTotal(summary.rejected),
+      icon: XCircle,
+      tone: "rose",
+    },
+    {
+      label: "En despacho",
+      value: summary.shipping,
+      detail: "En envío o entrega",
+      share: shareOfTotal(summary.shipping),
+      icon: Truck,
+      tone: "cyan",
+    },
+    {
+      label: "Finalizadas",
+      value: summary.completed,
+      detail: "Proceso cerrado",
+      share: shareOfTotal(summary.completed),
+      icon: PackageCheck,
+      tone: "navy",
+    },
+  ];
 
   const container = {
     hidden: { opacity: 0 },
@@ -189,13 +249,29 @@ export default function DashboardPage() {
       )}
 
       {isLoading ? (
-        <SkeletonCards count={3} />
+        <DashboardKpiSkeleton />
       ) : (
         <motion.div variants={container} initial="hidden" animate="visible" className="space-y-5">
-          <motion.section variants={item} className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            <MetricCard label="Solicitudes" value={String(summary.totalRequests)} detail="Solicitudes recibidas durante el mes" trend="0%" icon={FileCheck2} tone="violet" />
-            <MetricCard label="En gestión" value={String(inManagement)} detail="Pendientes por gestionar" trend="0%" icon={ClipboardList} tone="yellow" />
-            <MetricCard label="Cotizaciones realizadas" value={String(quoted)} detail="Cotizaciones emitidas durante el mes" trend="0%" icon={ReceiptText} tone="green" />
+          <motion.section
+            variants={item}
+            aria-label="Indicadores del período"
+            className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white shadow-[0_10px_30px_rgba(7,30,65,0.04)]"
+          >
+            <div className="grid grid-cols-2 divide-x divide-y divide-[var(--border)] sm:grid-cols-3 sm:divide-y-0">
+              {volumeKpis.map((kpi, index) => (
+                <KpiTile
+                  key={kpi.label}
+                  {...kpi}
+                  emphasis
+                  className={index === 0 ? "col-span-2 sm:col-span-1" : undefined}
+                />
+              ))}
+            </div>
+            <div className="grid grid-cols-2 divide-x divide-y divide-[var(--border)] border-t border-[var(--border)] bg-[var(--background)]/60 lg:grid-cols-4 lg:divide-y-0">
+              {outcomeKpis.map((kpi) => (
+                <KpiTile key={kpi.label} {...kpi} />
+              ))}
+            </div>
           </motion.section>
 
           <motion.div variants={item} className="grid grid-cols-1 gap-5 lg:grid-cols-2">
@@ -242,5 +318,81 @@ export default function DashboardPage() {
         </motion.div>
       )}
     </div>
+  );
+}
+
+type KpiTone = "violet" | "amber" | "blue" | "emerald" | "rose" | "cyan" | "navy";
+
+type DashboardKpi = {
+  label: string;
+  value: number;
+  detail: string;
+  share?: string;
+  icon: LucideIcon;
+  tone: KpiTone;
+};
+
+const kpiTones: Record<KpiTone, { icon: string; share: string; bar: string }> = {
+  violet: { icon: "bg-violet-50 text-[var(--purple)]", share: "text-[var(--purple)]", bar: "bg-[var(--purple)]" },
+  amber: { icon: "bg-amber-50 text-amber-600", share: "text-amber-600", bar: "bg-amber-400" },
+  blue: { icon: "bg-blue-50 text-[var(--blue)]", share: "text-[var(--blue)]", bar: "bg-[var(--blue)]" },
+  emerald: { icon: "bg-emerald-50 text-emerald-600", share: "text-emerald-600", bar: "bg-emerald-500" },
+  rose: { icon: "bg-rose-50 text-rose-600", share: "text-rose-600", bar: "bg-rose-400" },
+  cyan: { icon: "bg-cyan-50 text-[var(--cyan)]", share: "text-[var(--cyan)]", bar: "bg-[var(--cyan)]" },
+  navy: { icon: "bg-[var(--background)] text-[var(--navy)]", share: "text-[var(--navy)]", bar: "bg-[var(--navy)]" },
+};
+
+function KpiTile({
+  label,
+  value,
+  detail,
+  share,
+  icon: Icon,
+  tone,
+  emphasis = false,
+  className = "",
+}: DashboardKpi & { emphasis?: boolean; className?: string }) {
+  const style = kpiTones[tone];
+
+  return (
+    <article className={`relative min-w-0 px-3.5 py-3.5 pl-4 sm:px-4 sm:pl-5 ${emphasis ? "sm:py-4" : "sm:py-3.5"} ${className}`}>
+      <span className={`absolute inset-y-3 left-0 w-0.5 rounded-full ${style.bar}`} aria-hidden />
+      <div className="flex items-start justify-between gap-2">
+        <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${style.icon}`}>
+          <Icon className="h-4 w-4" aria-hidden />
+        </div>
+        {share ? <span className={`text-[10px] font-bold ${style.share}`}>{share}</span> : null}
+      </div>
+      <p className={`mt-2 font-display font-extrabold leading-none tracking-tight text-[var(--navy)] ${emphasis ? "text-[1.75rem]" : "text-2xl"}`}>
+        {value}
+      </p>
+      <p className="mt-1.5 truncate text-xs font-semibold text-[var(--navy)]">{label}</p>
+      <p className="truncate text-[10px] text-[var(--text-secondary)]">{detail}</p>
+    </article>
+  );
+}
+
+function DashboardKpiSkeleton() {
+  return (
+    <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white" aria-hidden>
+      <div className="grid grid-cols-2 divide-x divide-y divide-[var(--border)] sm:grid-cols-3 sm:divide-y-0">
+        {Array.from({ length: 3 }, (_, index) => (
+          <div key={`volume-${index}`} className={`animate-pulse px-4 py-4 ${index === 0 ? "col-span-2 sm:col-span-1" : ""}`}>
+            <div className="h-8 w-8 rounded-lg bg-gray-200" />
+            <div className="mt-3 h-7 w-12 rounded bg-gray-200" />
+            <div className="mt-2 h-3 w-24 rounded bg-gray-100" />
+          </div>
+        ))}
+      </div>
+      <div className="grid grid-cols-2 divide-x divide-y divide-[var(--border)] border-t border-[var(--border)] lg:grid-cols-4 lg:divide-y-0">
+        {Array.from({ length: 4 }, (_, index) => (
+          <div key={`outcome-${index}`} className="animate-pulse px-4 py-3.5">
+            <div className="h-8 w-8 rounded-lg bg-gray-200" />
+            <div className="mt-3 h-6 w-10 rounded bg-gray-200" />
+            <div className="mt-2 h-3 w-20 rounded bg-gray-100" />
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
