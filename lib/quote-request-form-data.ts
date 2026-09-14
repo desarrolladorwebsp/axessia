@@ -29,6 +29,7 @@ export type QuoteRequestFormPayload = {
     activeIngredient: string;
     concentration: string;
     tabletQuantity: number | null;
+    notes?: string | null;
   }>;
   medicalDevices?: Array<{
     name: string;

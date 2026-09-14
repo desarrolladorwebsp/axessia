@@ -68,7 +68,7 @@ type Detail = {
   updatedAt: string;
   patientName: string | null;
   productType?: ProductType;
-  medications: Array<{ commercialName: string; activeIngredient: string; concentration: string; tabletQuantity: number | null }>;
+  medications: Array<{ commercialName: string; activeIngredient: string; concentration: string; tabletQuantity: number | null; notes: string | null }>;
   medicalDevices?: Array<{ name: string; brand: string | null; model: string | null; quantity: number | null; description: string | null }>;
   hasQuote: boolean;
   canDecide: boolean;
@@ -431,6 +431,7 @@ export default function TrackingDetail({ requestNumber }: { requestNumber: strin
                     <th className="pb-3">Medicamento</th>
                     <th className="pb-3">Principio activo</th>
                     <th className="pb-3">Concentración</th>
+                    <th className="pb-3">Observaciones</th>
                     <th className="pb-3 text-right">Cantidad</th>
                   </tr>
                 </thead>
@@ -440,6 +441,7 @@ export default function TrackingDetail({ requestNumber }: { requestNumber: strin
                       <td className="py-3 font-semibold text-[var(--navy)]">{item.commercialName}</td>
                       <td className="py-3 text-[var(--text-secondary)]">{item.activeIngredient}</td>
                       <td className="py-3 text-[var(--text-secondary)]">{item.concentration}</td>
+                      <td className="py-3 text-[var(--text-secondary)]">{item.notes || "—"}</td>
                       <td className="py-3 text-right text-[var(--text-secondary)]">{item.tabletQuantity ?? "—"}</td>
                     </tr>
                   ))}

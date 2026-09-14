@@ -5,15 +5,16 @@ import { Loader2, Plus, Trash2 } from "lucide-react";
 import Modal from "../components/Modal";
 import { PrimaryButton, SecondaryButton } from "../components/Buttons";
 import { buildQuoteRequestFormData } from "@/lib/quote-request-form-data";
+import { readResponseJson } from "@/lib/http/read-response-json";
 import { PRODUCT_TYPE_LABELS, PRODUCT_TYPE_PLURAL_LABELS, isMedicalDevice, type ProductType } from "@/lib/product-type";
 
 type Customer = { id: string; name: string; email: string; phone: string; rut: string; city: string };
-type Product = { id: number; commercialName: string; activeIngredient: string; concentration: string; tabletQuantity: string };
+type Product = { id: number; commercialName: string; activeIngredient: string; concentration: string; tabletQuantity: string; notes: string };
 type Device = { id: number; name: string; brand: string; model: string; quantity: string; description: string };
 type Form = { name: string; email: string; phone: string; rut: string; city: string; patientName: string; patientRut: string; prescription: File | null; acceptsPolicies: boolean; acceptsDataTreatment: boolean };
 
 const emptyForm: Form = { name: "", email: "", phone: "", rut: "", city: "", patientName: "", patientRut: "", prescription: null, acceptsPolicies: false, acceptsDataTreatment: false };
-const emptyProduct = (id: number): Product => ({ id, commercialName: "", activeIngredient: "", concentration: "", tabletQuantity: "" });
+const emptyProduct = (id: number): Product => ({ id, commercialName: "", activeIngredient: "", concentration: "", tabletQuantity: "", notes: "" });
 const emptyDevice = (id: number): Device => ({ id, name: "", brand: "", model: "", quantity: "", description: "" });
 
 export default function CreateRequestModal({ open, onClose, onCreated }: { open: boolean; onClose: () => void; onCreated: () => void }) {
@@ -81,13 +82,17 @@ export default function CreateRequestModal({ open, onClose, onCreated }: { open:
           productType,
           customer: { name: form.name, email: form.email, phone: form.phone, rut: form.rut, city: form.city },
           patient: form.patientName.trim() || form.patientRut.trim() ? { name: form.patientName, rut: form.patientRut } : undefined,
-          medications: deviceRequest ? [] : products.map(({ id: _id, tabletQuantity, ...product }) => ({ ...product, tabletQuantity: tabletQuantity.trim() ? Number(tabletQuantity) : null })),
+          medications: deviceRequest ? [] : products.map(({ id: _id, tabletQuantity, notes, ...product }) => ({
+            ...product,
+            tabletQuantity: tabletQuantity.trim() ? Number(tabletQuantity) : null,
+            notes: notes.trim() || null,
+          })),
           medicalDevices: deviceRequest ? devices.map(({ id: _id, quantity, ...device }) => ({ ...device, quantity: quantity.trim() ? Number(quantity) : null })) : [],
           acceptsPolicies: form.acceptsPolicies,
           acceptsDataTreatment: form.acceptsDataTreatment,
         }, form.prescription),
       });
-      const result = await response.json() as { error?: string };
+      const result = await readResponseJson<{ error?: string }>(response);
       if (!response.ok) throw new Error(result.error || "No fue posible crear la solicitud.");
       setForm(emptyForm);
       setProductType("MEDICATION");
@@ -156,6 +161,10 @@ export default function CreateRequestModal({ open, onClose, onCreated }: { open:
                 <input type="number" min="1" value={product.tabletQuantity} onChange={(event) => updateProduct(product.id, "tabletQuantity", event.target.value)} placeholder="Cantidad (opcional)" className="field-input min-w-0" />
                 {products.length > 1 && <button type="button" onClick={() => setProducts((current) => current.filter((item) => item.id !== product.id))} className="icon-button-small" title={`Eliminar medicamento ${index + 1}`} aria-label={`Eliminar medicamento ${index + 1}`}><Trash2 className="h-3.5 w-3.5" /></button>}
               </div>
+              <label className="sm:col-span-2 lg:col-span-4 text-xs font-bold text-[var(--navy)]">
+                Observaciones del medicamento
+                <input value={product.notes} onChange={(event) => updateProduct(product.id, "notes", event.target.value)} maxLength={500} placeholder="Opcional" className="field-input mt-2" />
+              </label>
             </div>
           ))}
         </div>

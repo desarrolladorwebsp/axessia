@@ -33,6 +33,7 @@ export async function GET(request: NextRequest) {
           activeIngredient: true,
           concentration: true,
           tabletQuantity: true,
+          notes: true,
         },
       },
       medicalDevices: {

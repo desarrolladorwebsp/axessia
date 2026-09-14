@@ -49,6 +49,7 @@ export type MedicationInput = {
   activeIngredient: string;
   concentration: string;
   tabletQuantity: number | null;
+  notes: string | null;
 };
 
 export type MedicalDeviceInput = {
@@ -89,7 +90,8 @@ export function parseMedicationItems(rawItems: unknown): MedicationInput[] {
     if (!commercialName || !activeIngredient || !concentration || tabletQuantity === "invalid") {
       throw new Error(`Medicamento ${index + 1} incompleto`);
     }
-    return { commercialName, activeIngredient, concentration, tabletQuantity };
+    const notes = optionalText(row.notes)?.slice(0, 500) ?? null;
+    return { commercialName, activeIngredient, concentration, tabletQuantity, notes };
   });
 }
 

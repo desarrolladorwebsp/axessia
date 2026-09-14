@@ -74,6 +74,7 @@ export type DevQuoteRequestRecord = {
     activeIngredient: string;
     concentration: string;
     tabletQuantity: number | null;
+    notes: string | null;
     createdAt: string;
   }>;
   medicalDevices?: Array<{

@@ -14,6 +14,7 @@ import { ArrowLeft, ArrowRight, FileCheck2, FileUp, LoaderCircle, Minus, Plus, X
 
 import { isValidRut } from "@/lib/customer-validation";
 import { buildQuoteRequestFormData } from "@/lib/quote-request-form-data";
+import { readResponseJson } from "@/lib/http/read-response-json";
 import { PRODUCT_TYPE_LABELS, PRODUCT_TYPE_PLURAL_LABELS, isMedicalDevice, type ProductType } from "@/lib/product-type";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -30,6 +31,7 @@ type MedicationProduct = {
   activeIngredient: string;
   concentration: string;
   quantity: string;
+  notes: string;
 };
 
 type DeviceProduct = {
@@ -64,6 +66,7 @@ const emptyMedication = (id: number): MedicationProduct => ({
   activeIngredient: "",
   concentration: "",
   quantity: "",
+  notes: "",
 });
 
 const emptyDevice = (id: number): DeviceProduct => ({
@@ -259,6 +262,7 @@ export function QuoteModalProvider({ children }: { children: ReactNode }) {
             activeIngredient: product.activeIngredient,
             concentration: product.concentration,
             tabletQuantity: product.quantity.trim() ? Number(product.quantity) : null,
+            notes: product.notes.trim() || null,
           })),
           medicalDevices: isMedicalDevice(productType) ? devices.map((device) => ({
             name: device.name,
@@ -271,7 +275,7 @@ export function QuoteModalProvider({ children }: { children: ReactNode }) {
           acceptsDataTreatment: consents.data,
         }, values.file),
       });
-      const result = (await response.json()) as { requestNumber?: string; error?: string };
+      const result = await readResponseJson<{ requestNumber?: string; error?: string }>(response);
       if (!response.ok) throw new Error(result.error || "No fue posible guardar la solicitud.");
       setGeneratedRequestNumber(result.requestNumber ?? "");
       setIsSubmitted(true);
@@ -449,6 +453,10 @@ export function QuoteModalProvider({ children }: { children: ReactNode }) {
                                   <ProductField label="Concentración" placeholder="Ej: 500 mg" field="concentration" product={product} errors={errors} onChange={updateProduct} />
                                   <ProductField label="Cantidad de comprimidos (opcional)" placeholder="Ej: 30" field="quantity" product={product} errors={errors} onChange={updateProduct} />
                                 </div>
+                                <label className="quote-field quote-field-full" htmlFor={`product-${product.id}-notes`}>
+                                  <span>Observaciones del medicamento</span>
+                                  <input id={`product-${product.id}-notes`} value={product.notes} placeholder="Opcional" maxLength={500} onChange={(event) => updateProduct(product.id, "notes", event.target.value)} />
+                                </label>
                               </motion.div>
                             ))}
                           </AnimatePresence>

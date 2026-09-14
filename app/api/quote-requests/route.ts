@@ -266,7 +266,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: validationError instanceof Error ? validationError.message : "La solicitud está incompleta." }, { status: 400 });
   }
 
-  if (shouldUseJsonStorage()) {
+  try {
+    if (shouldUseJsonStorage()) {
     const records = await readDevQuoteRequests();
     const now = new Date().toISOString();
     const nextSequence = records.length + 1;
@@ -316,6 +317,7 @@ export async function POST(request: Request) {
         activeIngredient: medication.activeIngredient,
         concentration: medication.concentration,
         tabletQuantity: medication.tabletQuantity,
+        notes: medication.notes,
         createdAt: now,
       })),
       medicalDevices: medicalDevices.map((device, index) => ({
@@ -462,4 +464,17 @@ export async function POST(request: Request) {
   );
 
   return NextResponse.json(quoteRequest, { status: 201 });
+  } catch (error) {
+    console.error("Error creating quote request:", error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2011") {
+      return NextResponse.json(
+        { error: "No fue posible guardar la solicitud. Un campo opcional todavía es obligatorio en la base de datos." },
+        { status: 409 },
+      );
+    }
+    if (error instanceof Error && error.message === "Cliente no encontrado") {
+      return NextResponse.json({ error: error.message }, { status: 404 });
+    }
+    return NextResponse.json({ error: "No fue posible guardar la solicitud. Intenta nuevamente." }, { status: 500 });
+  }
 }

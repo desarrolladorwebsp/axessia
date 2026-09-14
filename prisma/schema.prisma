@@ -266,6 +266,7 @@ model Medication {
   activeIngredient String
   concentration    String
   tabletQuantity   Int?
+  notes            String?      @db.Text
   createdAt        DateTime     @default(now())
   request          QuoteRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
 
