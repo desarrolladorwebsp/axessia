@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { ClientDocumentKind } from "@/lib/client-document-type";
 import {
   deleteStoredFile,
   readStoredFile,
@@ -23,6 +24,12 @@ const documentSelect = {
   createdAt: true,
 } as const;
 
+const clientDocumentSelect = {
+  ...documentSelect,
+  documentKind: true,
+  customLabel: true,
+} as const;
+
 export class DocumentServiceError extends Error {
   constructor(
     message: string,
@@ -40,7 +47,7 @@ async function findDocumentRecord(
     case "prescriptions":
       return prisma.prescription.findUnique({ where: { id: documentId }, select: documentSelect });
     case "client-documents":
-      return prisma.clientDocument.findUnique({ where: { id: documentId }, select: documentSelect });
+      return prisma.clientDocument.findUnique({ where: { id: documentId }, select: clientDocumentSelect });
     case "mandate-documents":
       return prisma.mandateDocument.findUnique({ where: { id: documentId }, select: documentSelect });
     default:
@@ -62,7 +69,7 @@ async function updateDocumentRecord(
     case "prescriptions":
       return prisma.prescription.update({ where: { id: documentId }, data, select: documentSelect });
     case "client-documents":
-      return prisma.clientDocument.update({ where: { id: documentId }, data, select: documentSelect });
+      return prisma.clientDocument.update({ where: { id: documentId }, data, select: clientDocumentSelect });
     case "mandate-documents":
       return prisma.mandateDocument.update({ where: { id: documentId }, data, select: documentSelect });
     default:
@@ -90,7 +97,10 @@ async function deleteDocumentRecord(
 }
 
 export function serializeDocumentMeta(
-  record: Pick<StoredDocumentRecord, "id" | "fileName" | "mimeType" | "fileSize" | "storageKey" | "createdAt">,
+  record: Pick<StoredDocumentRecord, "id" | "fileName" | "mimeType" | "fileSize" | "storageKey" | "createdAt"> & {
+    documentKind?: ClientDocumentKind | null;
+    customLabel?: string | null;
+  },
 ) {
   return {
     id: record.id,
@@ -99,6 +109,8 @@ export function serializeDocumentMeta(
     fileSize: record.fileSize,
     createdAt: record.createdAt.toISOString(),
     hasStoredFile: Boolean(record.storageKey),
+    documentKind: record.documentKind ?? null,
+    customLabel: record.customLabel ?? null,
   };
 }
 
@@ -110,6 +122,8 @@ export async function createStoredDocumentFromBuffer(input: {
   extension: AllowedExtension;
   buffer: Buffer;
   customerId?: string | null;
+  documentKind?: ClientDocumentKind | null;
+  customLabel?: string | null;
 }): Promise<StoredDocumentRecord> {
   const request = await prisma.quoteRequest.findUnique({
     where: { id: input.requestId },
@@ -150,8 +164,10 @@ export async function createStoredDocumentFromBuffer(input: {
             mimeType: input.mimeType,
             fileSize: input.buffer.length,
             storageKey,
+            documentKind: input.documentKind ?? null,
+            customLabel: input.customLabel ?? null,
           },
-          select: documentSelect,
+          select: clientDocumentSelect,
         });
       case "mandate-documents":
         return prisma.mandateDocument.create({
@@ -177,7 +193,7 @@ export async function createStoredDocument(
   category: ManagedDocumentCategory,
   requestId: string,
   file: File,
-  options?: { customerId?: string | null },
+  options?: { customerId?: string | null; documentKind?: ClientDocumentKind | null; customLabel?: string | null },
 ): Promise<StoredDocumentRecord> {
   const validation = await validateFileUpload(file);
   if (!validation.ok) {
@@ -193,6 +209,8 @@ export async function createStoredDocument(
     extension,
     buffer,
     customerId: options?.customerId,
+    documentKind: options?.documentKind,
+    customLabel: options?.customLabel,
   });
 }
 

@@ -1,3 +1,4 @@
+import type { ClientDocumentKind } from "@/lib/client-document-type";
 import type { DocumentStorageType } from "@/lib/storage/types";
 
 export const MANAGED_DOCUMENT_CATEGORIES = [
@@ -16,6 +17,8 @@ export type StoredDocumentRecord = {
   fileSize: number;
   storageKey: string | null;
   createdAt: Date;
+  documentKind?: ClientDocumentKind | null;
+  customLabel?: string | null;
 };
 
 export function isManagedDocumentCategory(value: string): value is ManagedDocumentCategory {

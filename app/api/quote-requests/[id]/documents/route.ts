@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 
 import {
+  parseClientDocumentCustomLabel,
+  parseClientDocumentKind,
+  validateClientDocumentClassification,
+} from "@/lib/client-document-type";
+import {
   createStoredDocument,
   DocumentServiceError,
   serializeDocumentMeta,
@@ -34,6 +39,14 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     return NextResponse.json({ error: "Selecciona un documento válido." }, { status: 400 });
   }
 
+  const classification = validateClientDocumentClassification({
+    documentKind: parseClientDocumentKind(formData.get("documentKind")),
+    customLabel: parseClientDocumentCustomLabel(formData.get("customLabel")),
+  });
+  if (!classification.ok) {
+    return NextResponse.json({ error: classification.error }, { status: 400 });
+  }
+
   try {
     if (shouldUseJsonStorage()) {
       const records = await readDevQuoteRequests();
@@ -46,6 +59,8 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         mimeType: fileEntry.type || "application/octet-stream",
         fileSize: fileEntry.size,
         storageKey: null,
+        documentKind: classification.documentKind,
+        customLabel: classification.customLabel,
         createdAt: new Date().toISOString(),
       };
       records[index] = { ...records[index], clientDocuments: [document, ...(records[index].clientDocuments ?? [])] };
@@ -53,7 +68,10 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ ...document, hasStoredFile: false }, { status: 201 });
     }
 
-    const document = await createStoredDocument("client-documents", id, fileEntry);
+    const document = await createStoredDocument("client-documents", id, fileEntry, {
+      documentKind: classification.documentKind,
+      customLabel: classification.customLabel,
+    });
     return NextResponse.json(serializeDocumentMeta(document), { status: 201 });
   } catch (error) {
     return handleServiceError(error);

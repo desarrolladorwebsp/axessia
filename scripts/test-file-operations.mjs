@@ -108,6 +108,93 @@ async function createPrescriptionRequest() {
   return { requestId: body.id, prescription };
 }
 
+async function testClientDocuments(cookie, requestId) {
+  const missingKind = new FormData();
+  missingKind.append("file", new File([MIN_PNG], "cedula.png", { type: "image/png" }));
+  const missingKindResponse = await fetch(`${BASE_URL}/api/quote-requests/${requestId}/documents`, {
+    method: "POST",
+    headers: { Cookie: cookie },
+    body: missingKind,
+  });
+  if (missingKindResponse.status === 400) {
+    pass("Cliente · tipo de documento obligatorio");
+  } else {
+    fail("Cliente · tipo de documento obligatorio", `status ${missingKindResponse.status}`);
+  }
+
+  const missingLabel = new FormData();
+  missingLabel.append("file", new File([MIN_PNG], "otro.png", { type: "image/png" }));
+  missingLabel.append("documentKind", "OTHER");
+  const missingLabelResponse = await fetch(`${BASE_URL}/api/quote-requests/${requestId}/documents`, {
+    method: "POST",
+    headers: { Cookie: cookie },
+    body: missingLabel,
+  });
+  if (missingLabelResponse.status === 400) {
+    pass("Cliente · Otros exige nombre libre");
+  } else {
+    fail("Cliente · Otros exige nombre libre", `status ${missingLabelResponse.status}`);
+  }
+
+  const formData = new FormData();
+  formData.append("file", new File([MIN_PNG], "cedula-frente.png", { type: "image/png" }));
+  formData.append("documentKind", "ID_FRONT");
+  const response = await fetch(`${BASE_URL}/api/quote-requests/${requestId}/documents`, {
+    method: "POST",
+    headers: { Cookie: cookie },
+    body: formData,
+  });
+  const body = await response.json();
+  if (!response.ok || !body.hasStoredFile || body.documentKind !== "ID_FRONT") {
+    fail("Cliente · cargar cédula delantera", `${response.status} ${JSON.stringify(body)}`);
+    return;
+  }
+
+  const record = await prisma.clientDocument.findUnique({
+    where: { id: body.id },
+    select: { id: true, requestId: true, storageKey: true, documentKind: true, fileName: true },
+  });
+  if (!record?.storageKey || record.requestId !== requestId || record.documentKind !== "ID_FRONT") {
+    fail("Cliente · documento asociado en DB", JSON.stringify(record));
+    return;
+  }
+
+  const absolutePath = path.join(getStorageRoot(), record.storageKey);
+  try {
+    const stat = await fs.stat(absolutePath);
+    if (!stat.isFile() || stat.size <= 0) throw new Error("empty file");
+    pass("Cliente · archivo en disco");
+  } catch (error) {
+    fail("Cliente · archivo en disco", error instanceof Error ? error.message : String(error));
+    return;
+  }
+
+  const read = await fetch(`${BASE_URL}/api/files/client-documents/${body.id}`, {
+    headers: { Cookie: cookie },
+  });
+  if (read.ok && read.headers.get("content-type") === "image/png") {
+    pass("Cliente · visualizar documento");
+  } else {
+    fail("Cliente · visualizar documento", `status ${read.status} ${read.headers.get("content-type")}`);
+  }
+
+  const otherForm = new FormData();
+  otherForm.append("file", new File([MIN_PNG], "certificado.png", { type: "image/png" }));
+  otherForm.append("documentKind", "OTHER");
+  otherForm.append("customLabel", "Certificado médico");
+  const otherResponse = await fetch(`${BASE_URL}/api/quote-requests/${requestId}/documents`, {
+    method: "POST",
+    headers: { Cookie: cookie },
+    body: otherForm,
+  });
+  const otherBody = await otherResponse.json();
+  if (otherResponse.ok && otherBody.documentKind === "OTHER" && otherBody.customLabel === "Certificado médico" && otherBody.hasStoredFile) {
+    pass("Cliente · Otros con nombre libre");
+  } else {
+    fail("Cliente · Otros con nombre libre", `${otherResponse.status} ${JSON.stringify(otherBody)}`);
+  }
+}
+
 function getStorageRoot() {
   const configured = process.env.AXESSIA_STORAGE_ROOT?.trim();
   if (configured) return path.resolve(configured);
@@ -295,6 +382,7 @@ async function main() {
     const created = await createPrescriptionRequest();
     prescription = created.prescription;
     pass(`Fixture · solicitud con receta (${created.requestId})`);
+    await testClientDocuments(cookie, created.requestId);
   } catch (error) {
     fail("Fixture · solicitud con receta", error instanceof Error ? error.message : String(error));
     process.exitCode = 1;

@@ -48,7 +48,7 @@ export type MedicationInput = {
   commercialName: string;
   activeIngredient: string;
   concentration: string;
-  tabletQuantity: number;
+  tabletQuantity: number | null;
 };
 
 export type MedicalDeviceInput = {
@@ -67,6 +67,14 @@ function requiredText(value: unknown) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function parseOptionalPositiveInt(value: unknown): number | null | "invalid" {
+  if (value === undefined || value === null || value === "") return null;
+  const parsed = Number(value);
+  const quantity = Number.isFinite(parsed) ? Math.trunc(parsed) : NaN;
+  if (!Number.isInteger(quantity) || quantity <= 0) return "invalid";
+  return quantity;
+}
+
 export function parseMedicationItems(rawItems: unknown): MedicationInput[] {
   if (!Array.isArray(rawItems) || rawItems.length === 0) {
     throw new Error("Agrega al menos un medicamento");
@@ -77,8 +85,8 @@ export function parseMedicationItems(rawItems: unknown): MedicationInput[] {
     const commercialName = requiredText(row.commercialName);
     const activeIngredient = requiredText(row.activeIngredient);
     const concentration = requiredText(row.concentration);
-    const tabletQuantity = Number(row.tabletQuantity);
-    if (!commercialName || !activeIngredient || !concentration || !Number.isInteger(tabletQuantity) || tabletQuantity <= 0) {
+    const tabletQuantity = parseOptionalPositiveInt(row.tabletQuantity);
+    if (!commercialName || !activeIngredient || !concentration || tabletQuantity === "invalid") {
       throw new Error(`Medicamento ${index + 1} incompleto`);
     }
     return { commercialName, activeIngredient, concentration, tabletQuantity };

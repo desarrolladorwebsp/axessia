@@ -9,7 +9,7 @@ import { defaultQuoteValidUntilDate, formatLocalDate } from "@/lib/quote-items";
 import { isMedicalDevice, type ProductType } from "@/lib/product-type";
 import type { QuoteDetail } from "./ViewQuoteModal";
 
-type MedicationSeed = { commercialName: string; activeIngredient: string; concentration: string; tabletQuantity: number };
+type MedicationSeed = { commercialName: string; activeIngredient: string; concentration: string; tabletQuantity: number | null };
 type DeviceSeed = { name: string; brand: string | null; model: string | null; quantity: number | null; description: string | null };
 
 export type QuoteDraftItem = {
@@ -47,7 +47,7 @@ const emptyItem = (productType: ProductType, seed?: MedicationSeed | DeviceSeed)
     model: deviceSeed?.model ?? "",
     description: deviceSeed?.description ?? "",
     presentation: "",
-    unitsPerPackage: medicationSeed ? String(medicationSeed.tabletQuantity) : "",
+    unitsPerPackage: medicationSeed?.tabletQuantity != null ? String(medicationSeed.tabletQuantity) : "",
     manufacturer: deviceSeed?.brand ?? "",
     originCountry: "",
     supplierCountry: "",

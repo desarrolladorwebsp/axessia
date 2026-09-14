@@ -58,7 +58,7 @@ export default function AboutPage() {
 
           <div className="about-image-wrap">
             <Image
-              src="/images/OperationsProcess-section/bg-operations-process.png"
+              src="/images/us-section/us.png"
               alt="Equipo AXESSIA gestionando solicitudes internacionales"
               fill
               priority

@@ -4,7 +4,8 @@ import { FormEvent, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowLeft, ArrowRight, Check, Eye, EyeOff, KeyRound } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, KeyRound } from "lucide-react";
+import PasswordInput from "@/components/PasswordInput";
 
 type ResetStatus = "loading" | "valid" | "invalid" | "success";
 
@@ -183,24 +184,16 @@ export default function ResetPasswordView() {
             variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
           >
             <span>Nueva contraseña</span>
-            <span className="register-password-input">
-              <input
-                id="reset-password"
-                type={showPassword ? "text" : "password"}
-                placeholder="Mínimo 8 caracteres"
-                autoComplete="new-password"
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((visible) => !visible)}
-                aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
-              >
-                {showPassword ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
-              </button>
-            </span>
+            <PasswordInput
+              id="reset-password"
+              placeholder="Mínimo 8 caracteres"
+              autoComplete="new-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              required
+              visible={showPassword}
+              onToggleVisibility={() => setShowPassword((visible) => !visible)}
+            />
           </motion.label>
 
           <motion.label
@@ -209,24 +202,18 @@ export default function ResetPasswordView() {
             variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
           >
             <span>Confirmar contraseña</span>
-            <span className="register-password-input">
-              <input
-                id="reset-confirm-password"
-                type={showConfirm ? "text" : "password"}
-                placeholder="Repite tu contraseña"
-                autoComplete="new-password"
-                value={confirmPassword}
-                onChange={(event) => setConfirmPassword(event.target.value)}
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowConfirm((visible) => !visible)}
-                aria-label={showConfirm ? "Ocultar contraseña" : "Mostrar contraseña"}
-              >
-                {showConfirm ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}
-              </button>
-            </span>
+            <PasswordInput
+              id="reset-confirm-password"
+              placeholder="Repite tu contraseña"
+              autoComplete="new-password"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              required
+              visible={showConfirm}
+              onToggleVisibility={() => setShowConfirm((visible) => !visible)}
+              revealLabel="Mostrar confirmación de contraseña"
+              hideLabel="Ocultar confirmación de contraseña"
+            />
           </motion.label>
 
           <p className="register-password-help">Usa una mayúscula, una minúscula y un número.</p>

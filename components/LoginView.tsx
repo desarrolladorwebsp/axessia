@@ -4,6 +4,7 @@ import { FormEvent, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, BriefcaseBusiness, Check, LockKeyhole, UserRound } from "lucide-react";
+import PasswordInput from "@/components/PasswordInput";
 
 type AccountType = "client" | "executive";
 type ViewMode = "login" | "recovery";
@@ -13,6 +14,7 @@ export default function LoginView() {
   const [viewMode, setViewMode] = useState<ViewMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [recoveryEmail, setRecoveryEmail] = useState("");
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
@@ -178,14 +180,15 @@ export default function LoginView() {
               variants={{ hidden: { opacity: 0, y: 10 }, visible: { opacity: 1, y: 0 } }}
             >
               <span>Contraseña</span>
-              <input
+              <PasswordInput
                 id="login-password"
-                type="password"
                 placeholder="Ingresa tu contraseña"
                 autoComplete="current-password"
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 required
+                visible={showPassword}
+                onToggleVisibility={() => setShowPassword((visible) => !visible)}
               />
             </motion.label>
             {accountType === "executive" && (

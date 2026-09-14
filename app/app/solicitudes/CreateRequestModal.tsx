@@ -55,7 +55,12 @@ export default function CreateRequestModal({ open, onClose, onCreated }: { open:
     const validCustomer = [form.name, form.email, form.phone, form.rut, form.city].every((value) => value.trim());
     const validProducts = deviceRequest
       ? devices.every((device) => device.name.trim())
-      : products.every((product) => product.commercialName.trim() && product.activeIngredient.trim() && product.concentration.trim() && Number(product.tabletQuantity) > 0);
+      : products.every((product) => {
+        if (!product.commercialName.trim() || !product.activeIngredient.trim() || !product.concentration.trim()) return false;
+        if (!product.tabletQuantity.trim()) return true;
+        const quantity = Number(product.tabletQuantity);
+        return Number.isInteger(quantity) && quantity > 0;
+      });
     const missing: string[] = [];
     if (!validCustomer) missing.push("datos del cliente");
     if (!deviceRequest && !form.prescription) missing.push("receta médica (adjunta un archivo)");
@@ -76,7 +81,7 @@ export default function CreateRequestModal({ open, onClose, onCreated }: { open:
           productType,
           customer: { name: form.name, email: form.email, phone: form.phone, rut: form.rut, city: form.city },
           patient: form.patientName.trim() || form.patientRut.trim() ? { name: form.patientName, rut: form.patientRut } : undefined,
-          medications: deviceRequest ? [] : products.map(({ id: _id, tabletQuantity, ...product }) => ({ ...product, tabletQuantity: Number(tabletQuantity) })),
+          medications: deviceRequest ? [] : products.map(({ id: _id, tabletQuantity, ...product }) => ({ ...product, tabletQuantity: tabletQuantity.trim() ? Number(tabletQuantity) : null })),
           medicalDevices: deviceRequest ? devices.map(({ id: _id, quantity, ...device }) => ({ ...device, quantity: quantity.trim() ? Number(quantity) : null })) : [],
           acceptsPolicies: form.acceptsPolicies,
           acceptsDataTreatment: form.acceptsDataTreatment,
@@ -148,7 +153,7 @@ export default function CreateRequestModal({ open, onClose, onCreated }: { open:
               <input value={product.activeIngredient} onChange={(event) => updateProduct(product.id, "activeIngredient", event.target.value)} placeholder="Principio activo" className="field-input" />
               <input value={product.concentration} onChange={(event) => updateProduct(product.id, "concentration", event.target.value)} placeholder="Concentración" className="field-input" />
               <div className="flex gap-2">
-                <input type="number" min="1" value={product.tabletQuantity} onChange={(event) => updateProduct(product.id, "tabletQuantity", event.target.value)} placeholder="Cantidad" className="field-input min-w-0" />
+                <input type="number" min="1" value={product.tabletQuantity} onChange={(event) => updateProduct(product.id, "tabletQuantity", event.target.value)} placeholder="Cantidad (opcional)" className="field-input min-w-0" />
                 {products.length > 1 && <button type="button" onClick={() => setProducts((current) => current.filter((item) => item.id !== product.id))} className="icon-button-small" title={`Eliminar medicamento ${index + 1}`} aria-label={`Eliminar medicamento ${index + 1}`}><Trash2 className="h-3.5 w-3.5" /></button>}
               </div>
             </div>

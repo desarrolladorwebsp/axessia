@@ -68,7 +68,7 @@ type Detail = {
   updatedAt: string;
   patientName: string | null;
   productType?: ProductType;
-  medications: Array<{ commercialName: string; activeIngredient: string; concentration: string; tabletQuantity: number }>;
+  medications: Array<{ commercialName: string; activeIngredient: string; concentration: string; tabletQuantity: number | null }>;
   medicalDevices?: Array<{ name: string; brand: string | null; model: string | null; quantity: number | null; description: string | null }>;
   hasQuote: boolean;
   canDecide: boolean;
@@ -440,7 +440,7 @@ export default function TrackingDetail({ requestNumber }: { requestNumber: strin
                       <td className="py-3 font-semibold text-[var(--navy)]">{item.commercialName}</td>
                       <td className="py-3 text-[var(--text-secondary)]">{item.activeIngredient}</td>
                       <td className="py-3 text-[var(--text-secondary)]">{item.concentration}</td>
-                      <td className="py-3 text-right text-[var(--text-secondary)]">{item.tabletQuantity}</td>
+                      <td className="py-3 text-right text-[var(--text-secondary)]">{item.tabletQuantity ?? "—"}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -662,6 +662,26 @@ export default function TrackingDetail({ requestNumber }: { requestNumber: strin
                   ? "¿Confirmas que deseas rechazar esta cotización? Se registrará el motivo y la fecha."
                   : "¿Confirmas que deseas continuar el proceso sin pagar ahora? AXESSIA coordinará contigo los siguientes pasos."}
             </p>
+            {confirmKind === "accept" && (
+              <div className="mt-4 rounded-xl border border-[var(--border)] bg-[var(--background)] p-4">
+                <div className="flex items-start gap-2">
+                  <ShieldCheck size={18} className="mt-0.5 shrink-0 text-[var(--blue)]" aria-hidden="true" />
+                  <div>
+                    <p className="text-sm font-bold text-[var(--navy)]">Documentos necesarios más adelante</p>
+                    <p className="mt-1 text-sm leading-6 text-[var(--text-secondary)]">
+                      Al aceptar, registramos tu decisión. Para continuar con el proceso posteriormente deberás proporcionar:
+                    </p>
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-sm font-semibold text-[var(--navy)]">
+                      <li>Fotocopia de tu cédula de identidad</li>
+                      <li>Poder notarial simple</li>
+                    </ul>
+                    <p className="mt-2 text-xs leading-5 text-[var(--text-secondary)]">
+                      Estos documentos no se solicitan en este paso.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
             {confirmKind === "reject" && (
               <div className="mt-4">
                 <label className="block text-sm font-bold text-[var(--navy)]" htmlFor="reject-reason">
@@ -742,7 +762,7 @@ function Overlay({ title, children, onClose }: { title: string; children: React.
         initial={{ opacity: 0, y: 12, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         exit={{ opacity: 0, y: 8, scale: 0.98 }}
-        className="w-full max-w-md rounded-2xl bg-white p-5 shadow-[0_20px_60px_rgba(7,30,65,0.25)]"
+        className="w-full max-w-lg rounded-2xl bg-white p-5 shadow-[0_20px_60px_rgba(7,30,65,0.25)]"
         role="dialog"
         aria-modal="true"
         aria-label={title}

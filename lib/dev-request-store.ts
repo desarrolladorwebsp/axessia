@@ -46,6 +46,8 @@ export type DevQuoteRequestRecord = {
     mimeType: string;
     fileSize: number;
     storageKey?: string | null;
+    documentKind?: string | null;
+    customLabel?: string | null;
     createdAt: string;
   }>;
   generatedMandate?: {
@@ -71,7 +73,7 @@ export type DevQuoteRequestRecord = {
     commercialName: string;
     activeIngredient: string;
     concentration: string;
-    tabletQuantity: number;
+    tabletQuantity: number | null;
     createdAt: string;
   }>;
   medicalDevices?: Array<{

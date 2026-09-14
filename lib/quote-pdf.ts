@@ -205,11 +205,21 @@ async function embedBrandLogo(pdf: PDFDocument): Promise<PDFImage | null> {
   }
 }
 
+async function embedPaymentLogo(pdf: PDFDocument): Promise<PDFImage | null> {
+  try {
+    const bytes = await fs.readFile(path.join(process.cwd(), "public", "images", "footer", "logo-banchile_pagos.png"));
+    return await pdf.embedPng(bytes);
+  } catch {
+    return null;
+  }
+}
+
 export async function generateQuotePdf(quote: QuotePdfData) {
   const pdf = await PDFDocument.create();
   const regular = await pdf.embedFont(StandardFonts.Helvetica);
   const bold = await pdf.embedFont(StandardFonts.HelveticaBold);
   const logo = await embedBrandLogo(pdf);
+  const paymentLogo = await embedPaymentLogo(pdf);
   const company = getAxessiaLegalDetails();
   const pages: PDFPage[] = [];
 
@@ -348,31 +358,86 @@ export async function generateQuotePdf(quote: QuotePdfData) {
     page.drawLine({ start: { x: margin, y }, end: { x: pageWidth - margin, y }, thickness: 0.4, color: border });
   });
 
+  const paymentIntro = "Contamos con método de pago con tarjeta de débito y crédito.";
+  const paymentCaption = "Pago tarjeta de crédito 3 cuotas sin intereses";
+  const paymentBoxWidth = 292;
+  const paymentPad = 12;
+  const paymentInnerWidth = paymentBoxWidth - paymentPad * 2;
+  const paymentIntroLines = wrap(paymentIntro, regular, 8, paymentInnerWidth);
+  const paymentCaptionLines = wrap(paymentCaption, bold, 8, paymentInnerWidth);
+  const paymentLogoHeight = paymentLogo ? 30 : 0;
+  const paymentLogoWidth = paymentLogo
+    ? Math.min(paymentLogo.width * (paymentLogoHeight / paymentLogo.height), 72)
+    : 0;
+  const paymentBoxHeight =
+    paymentPad +
+    16 +
+    paymentIntroLines.length * 11 +
+    (paymentLogo ? 8 + paymentLogoHeight : 0) +
+    6 +
+    paymentCaptionLines.length * 11 +
+    paymentPad;
+  const totalBoxWidth = 220;
   const totalBoxHeight = 46;
-  ensureSpace(totalBoxHeight + 8);
+  const summaryRowHeight = Math.max(paymentBoxHeight, totalBoxHeight);
+
+  ensureSpace(summaryRowHeight + 16);
   y -= 10;
+  const summaryTop = y;
+
   page.drawRectangle({
-    x: pageWidth - margin - 220,
-    y: y - totalBoxHeight,
-    width: 220,
+    x: margin,
+    y: summaryTop - paymentBoxHeight,
+    width: paymentBoxWidth,
+    height: paymentBoxHeight,
+    color: canvas,
+    borderColor: border,
+    borderWidth: 0.8,
+  });
+  let payY = summaryTop - 16;
+  page.drawText("MEDIOS DE PAGO", { x: margin + paymentPad, y: payY, size: 8, font: bold, color: blue });
+  payY -= 14;
+  for (const line of paymentIntroLines) {
+    page.drawText(line, { x: margin + paymentPad, y: payY, size: 8, font: regular, color: muted });
+    payY -= 11;
+  }
+  if (paymentLogo) {
+    payY -= 4;
+    page.drawImage(paymentLogo, {
+      x: margin + paymentPad,
+      y: payY - paymentLogoHeight,
+      width: paymentLogoWidth,
+      height: paymentLogoHeight,
+    });
+    payY -= paymentLogoHeight + 8;
+  }
+  for (const line of paymentCaptionLines) {
+    page.drawText(line, { x: margin + paymentPad, y: payY, size: 8, font: bold, color: navy });
+    payY -= 11;
+  }
+
+  page.drawRectangle({
+    x: pageWidth - margin - totalBoxWidth,
+    y: summaryTop - totalBoxHeight,
+    width: totalBoxWidth,
     height: totalBoxHeight,
     color: navyDark,
   });
   page.drawText("Total cotización", {
-    x: pageWidth - margin - 204,
-    y: y - 18,
+    x: pageWidth - margin - totalBoxWidth + 16,
+    y: summaryTop - 18,
     size: 8,
     font: regular,
     color: rgb(0.75, 0.82, 0.9),
   });
   page.drawText(money(quote.total), {
-    x: pageWidth - margin - 204,
-    y: y - 36,
+    x: pageWidth - margin - totalBoxWidth + 16,
+    y: summaryTop - 36,
     size: 14,
     font: bold,
     color: white,
   });
-  y -= totalBoxHeight + 18;
+  y = summaryTop - summaryRowHeight - 18;
 
   const notes = [
     `Vigencia: ${quote.validUntil ? formatDate(quote.validUntil) : "Sin fecha de vencimiento"}`,

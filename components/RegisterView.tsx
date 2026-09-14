@@ -2,8 +2,9 @@
 
 import { FormEvent, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Check, Eye, EyeOff, ShieldCheck, UserPlus } from "lucide-react";
+import { ArrowRight, Check, ShieldCheck, UserPlus } from "lucide-react";
 import { isValidRut, normalizeRut } from "@/lib/customer-validation";
+import PasswordInput from "@/components/PasswordInput";
 
 type RegisterForm = {
   name: string;
@@ -183,5 +184,17 @@ function Field({ label, placeholder, value, onChange, type = "text" }: { label: 
 }
 
 function PasswordField({ label, placeholder, value, visible, onToggle, onChange }: { label: string; placeholder: string; value: string; visible: boolean; onToggle: () => void; onChange: (value: string) => void }) {
-  return <label className="register-field"><span>{label}</span><span className="register-password-input"><input type={visible ? "text" : "password"} placeholder={placeholder} value={value} onChange={(event) => onChange(event.target.value)} required /><button type="button" onClick={onToggle} aria-label={visible ? "Ocultar contraseña" : "Mostrar contraseña"}>{visible ? <EyeOff size={17} aria-hidden="true" /> : <Eye size={17} aria-hidden="true" />}</button></span></label>;
+  return (
+    <label className="register-field">
+      <span>{label}</span>
+      <PasswordInput
+        placeholder={placeholder}
+        value={value}
+        required
+        visible={visible}
+        onToggleVisibility={onToggle}
+        onChange={(event) => onChange(event.target.value)}
+      />
+    </label>
+  );
 }

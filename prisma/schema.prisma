@@ -70,6 +70,13 @@ enum ProductType {
   MEDICAL_DEVICE
 }
 
+enum ClientDocumentKind {
+  MANDATE
+  ID_FRONT
+  ID_BACK
+  OTHER
+}
+
 model User {
   id                 String                         @id @default(cuid())
   firstName          String
@@ -191,14 +198,16 @@ model GeneratedMandate {
 }
 
 model ClientDocument {
-  id        String       @id @default(cuid())
-  requestId String
-  fileName  String
-  mimeType  String
-  fileSize  Int
-  storageKey String?
-  createdAt DateTime     @default(now())
-  request   QuoteRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  id            String              @id @default(cuid())
+  requestId     String
+  fileName      String
+  mimeType      String
+  fileSize      Int
+  storageKey    String?
+  documentKind  ClientDocumentKind?
+  customLabel   String?
+  createdAt     DateTime            @default(now())
+  request       QuoteRequest        @relation(fields: [requestId], references: [id], onDelete: Cascade)
 
   @@index([requestId, createdAt])
 }
@@ -256,7 +265,7 @@ model Medication {
   commercialName   String
   activeIngredient String
   concentration    String
-  tabletQuantity   Int
+  tabletQuantity   Int?
   createdAt        DateTime     @default(now())
   request          QuoteRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
 

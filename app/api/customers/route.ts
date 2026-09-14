@@ -6,6 +6,7 @@ import { INTERNAL_SESSION_COOKIE, verifyInternalSessionToken } from "@/lib/auth"
 import { isValidRut, normalizeCustomerName, normalizeEmail, normalizeRut } from "@/lib/customer-validation";
 import { normalizeSearchValue } from "@/lib/search";
 import { getInternalActor } from "@/lib/internal-access";
+import { customerStatusLabel } from "@/lib/customer-status";
 
 export async function GET(request: NextRequest) {
   try {
@@ -62,15 +63,6 @@ export async function GET(request: NextRequest) {
     const customersWithStatus = customers.map((customer) => {
       const latest = customer.requests[0];
       const latestStatus = latest?.status ?? null;
-      const statusLabel = latestStatus && ["RECEIVED", "SOURCING", "QUOTED", "AWAITING_DECISION"].includes(latestStatus)
-        ? "En proceso"
-        : latestStatus && ["ACCEPTED", "SHIPPING", "COMPLETED"].includes(latestStatus)
-          ? "Activo"
-          : latestStatus && ["REJECTED", "CANCELLED"].includes(latestStatus)
-            ? "Finalizado"
-            : customer.hasPendingRequest
-              ? "Pendiente"
-              : "Pendiente";
 
       return {
         id: customer.id,
@@ -80,7 +72,7 @@ export async function GET(request: NextRequest) {
         rut: customer.rut,
         city: customer.city,
         hasPendingRequest: customer.hasPendingRequest,
-        status: statusLabel,
+        status: customerStatusLabel(latestStatus),
         requestCount: customer._count.requests,
         lastActivity: latest?.updatedAt?.toISOString() ?? customer.updatedAt.toISOString(),
         createdAt: customer.createdAt.toISOString(),

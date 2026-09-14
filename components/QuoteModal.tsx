@@ -18,6 +18,12 @@ import { PRODUCT_TYPE_LABELS, PRODUCT_TYPE_PLURAL_LABELS, isMedicalDevice, type 
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
 
+function formatPrescriptionSize(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
 type MedicationProduct = {
   id: number;
   name: string;
@@ -139,23 +145,31 @@ export function QuoteModalProvider({ children }: { children: ReactNode }) {
     setErrors((current) => ({ ...current, file: "" }));
   };
 
-  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] ?? null;
+  const applyPrescriptionFile = (file: File | null, input?: HTMLInputElement | null) => {
     setFileError("");
     if (!file) return;
 
     if (!file.type.startsWith("image/") && file.type !== "application/pdf") {
       setFileError("Adjunta un PDF o una imagen válida.");
-      event.target.value = "";
+      if (input) input.value = "";
+      return;
+    }
+    if (file.size <= 0) {
+      setFileError("El archivo está vacío.");
+      if (input) input.value = "";
       return;
     }
     if (file.size > MAX_FILE_SIZE) {
       setFileError("El archivo no puede superar los 10 MB.");
-      event.target.value = "";
+      if (input) input.value = "";
       return;
     }
     setValues((current) => ({ ...current, file }));
     setErrors((current) => ({ ...current, file: "" }));
+  };
+
+  const handleFileChange = (event: ChangeEvent<HTMLInputElement>) => {
+    applyPrescriptionFile(event.target.files?.[0] ?? null, event.target);
   };
 
   const validateContact = () => {
@@ -192,9 +206,15 @@ export function QuoteModalProvider({ children }: { children: ReactNode }) {
       });
     } else {
       products.forEach((product) => {
-        (Object.keys(emptyMedication(product.id)).filter((field) => field !== "id") as Array<keyof Omit<MedicationProduct, "id">>).forEach((field) => {
+        (["name", "activeIngredient", "concentration"] as const).forEach((field) => {
           if (!product[field].trim()) nextErrors[`product-${product.id}-${field}`] = "Obligatorio";
         });
+        if (product.quantity.trim()) {
+          const quantity = Number(product.quantity);
+          if (!Number.isInteger(quantity) || quantity <= 0) {
+            nextErrors[`product-${product.id}-quantity`] = "Ingresa un número entero mayor a 0.";
+          }
+        }
       });
     }
 
@@ -238,7 +258,7 @@ export function QuoteModalProvider({ children }: { children: ReactNode }) {
             commercialName: product.name,
             activeIngredient: product.activeIngredient,
             concentration: product.concentration,
-            tabletQuantity: Number(product.quantity),
+            tabletQuantity: product.quantity.trim() ? Number(product.quantity) : null,
           })),
           medicalDevices: isMedicalDevice(productType) ? devices.map((device) => ({
             name: device.name,
@@ -370,10 +390,16 @@ export function QuoteModalProvider({ children }: { children: ReactNode }) {
                   </fieldset>
                   <fieldset>
                     <legend>{isMedicalDevice(productType) ? "Documento de respaldo" : "Receta médica"}</legend>
-                    <label className={`quote-upload ${fileError || errors.file ? "has-error" : ""}`} htmlFor="quote-file">
-                      <FileUp size={23} aria-hidden="true" />
+                    <label className={`quote-upload ${values.file ? "is-loaded" : ""} ${fileError || errors.file ? "has-error" : ""}`} htmlFor="quote-file">
+                      {values.file ? <FileCheck2 size={23} aria-hidden="true" /> : <FileUp size={23} aria-hidden="true" />}
                       <span>{values.file ? values.file.name : isMedicalDevice(productType) ? "Adjunta un documento, si lo tienes" : "Adjunta tu receta"}</span>
-                      <small>{isMedicalDevice(productType) ? "Opcional · PDF, JPG, PNG o HEIC · Máximo 10 MB" : "PDF, JPG, PNG o HEIC · Máximo 10 MB"}</small>
+                      <small>
+                        {values.file
+                          ? `Cargada correctamente · ${formatPrescriptionSize(values.file.size)}`
+                          : isMedicalDevice(productType)
+                            ? "Opcional · PDF, JPG, PNG o HEIC · Máximo 10 MB"
+                            : "PDF, JPG, PNG o HEIC · Máximo 10 MB"}
+                      </small>
                       <input id="quote-file" type="file" accept="application/pdf,image/*" onChange={handleFileChange} />
                     </label>
                     {(fileError || errors.file) && <p className="quote-error">{fileError || errors.file}</p>}
@@ -421,7 +447,7 @@ export function QuoteModalProvider({ children }: { children: ReactNode }) {
                                   <ProductField label="Nombre comercial" placeholder="Ej: Producto indicado" field="name" product={product} errors={errors} onChange={updateProduct} />
                                   <ProductField label="Principio activo" placeholder="Ej: Principio activo" field="activeIngredient" product={product} errors={errors} onChange={updateProduct} />
                                   <ProductField label="Concentración" placeholder="Ej: 500 mg" field="concentration" product={product} errors={errors} onChange={updateProduct} />
-                                  <ProductField label="Cantidad de comprimidos" placeholder="Ej: 30" field="quantity" product={product} errors={errors} onChange={updateProduct} />
+                                  <ProductField label="Cantidad de comprimidos (opcional)" placeholder="Ej: 30" field="quantity" product={product} errors={errors} onChange={updateProduct} />
                                 </div>
                               </motion.div>
                             ))}

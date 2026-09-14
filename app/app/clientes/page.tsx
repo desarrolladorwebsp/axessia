@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { motion } from "framer-motion";
-import { Activity, ChevronDown, UserRound, UsersRound } from "lucide-react";
+import { Activity, Eye, Plus, UserRound, UsersRound } from "lucide-react";
 import PageHeader from "../components/PageHeader";
 import MetricCard from "../components/MetricCard";
 import { PrimaryButton } from "../components/Buttons";
@@ -10,7 +11,6 @@ import StatusBadge, { type StatusTone } from "../components/StatusBadge";
 import Avatar from "../components/Avatar";
 import { FilterBar, SearchField, FilterSelect } from "../components/FilterBar";
 import Pagination from "../components/Pagination";
-import { Plus } from "lucide-react";
 import CreateCustomerModal from "./CreateCustomerModal";
 
 type CustomerRecord = {
@@ -139,21 +139,21 @@ export default function ClientsPage() {
                 <motion.tr key={client.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: index * 0.04 }} className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--background)]">
                   <td className="px-5 py-4"><input type="checkbox" aria-label={`Seleccionar a ${client.name}`} className="accent-[var(--purple)]" /></td>
                   <td className="px-3 py-4">
-                    <div className="flex items-center gap-3">
+                    <Link href={`/app/clientes/${client.id}`} className="flex items-center gap-3 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue)]">
                       <Avatar name={client.name} />
                       <div className="min-w-0">
                         <p className="max-w-[170px] truncate text-xs font-bold text-[var(--navy)]">{client.name}</p>
                         <p className="max-w-[170px] truncate text-[10px] text-[var(--text-secondary)]">{client.email}</p>
                       </div>
-                    </div>
+                    </Link>
                   </td>
                   <td className="px-3 py-4 text-xs text-[var(--text-secondary)]">{client.city}</td>
                   <td className="px-3 py-4"><StatusBadge label={client.status} tone={statusTones[client.status]} /></td>
                   <td className="px-3 py-4 text-[10px] text-[var(--text-secondary)]">{new Date(client.lastActivity).toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" })}</td>
                   <td className="px-3 py-4">
-                    <button className="icon-button-small" aria-label={`Acciones para ${client.name}`} title="Acciones">
-                      <ChevronDown className="h-3.5 w-3.5" />
-                    </button>
+                    <Link href={`/app/clientes/${client.id}`} className="icon-button-small" aria-label={`Ver ficha de ${client.name}`} title="Ver ficha">
+                      <Eye className="h-3.5 w-3.5" />
+                    </Link>
                   </td>
                 </motion.tr>
               ))}
@@ -164,6 +164,7 @@ export default function ClientsPage() {
         <div className="divide-y divide-[var(--border)] md:hidden">
           {clients.map((client) => (
             <article key={client.id} className="p-4">
+              <Link href={`/app/clientes/${client.id}`} className="block rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue)]">
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-center gap-3">
                   <Avatar name={client.name} />
@@ -178,6 +179,7 @@ export default function ClientsPage() {
                 <span>{client.city}</span>
                 <span>{new Date(client.lastActivity).toLocaleString("es-CL", { day: "2-digit", month: "2-digit", year: "numeric" })}</span>
               </div>
+              </Link>
             </article>
           ))}
         </div>
