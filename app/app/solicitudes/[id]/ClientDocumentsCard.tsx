@@ -45,7 +45,7 @@ export default function ClientDocumentsCard({ requestId, initialDocuments, gener
       return;
     }
     if (documentKind === "OTHER" && customLabel.trim().length < 2) {
-      setError("Indica el nombre o tipo del documento.");
+      setError("Indica el nombre del documento.");
       return;
     }
 
@@ -80,7 +80,7 @@ export default function ClientDocumentsCard({ requestId, initialDocuments, gener
       return;
     }
     if (documentKind === "OTHER" && customLabel.trim().length < 2) {
-      setError("Indica el nombre o tipo del documento.");
+      setError("Indica el nombre del documento.");
       return;
     }
     setError("");

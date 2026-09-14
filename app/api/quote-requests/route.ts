@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import { Prisma, QuoteRequestStatus, QuoteRequestOrigin } from "@prisma/client";
 import { prisma } from "@/lib/prisma";
+import { buildSystemDocumentFileName } from "@/lib/documents/file-name";
 import { savePrescriptionForRequest, validatePrescriptionUpload, type ValidatedPrescriptionUpload } from "@/lib/documents/prescription";
 import { createDevRequestNotification, readDevQuotes, shouldUseJsonStorage, readDevQuoteRequests, writeDevQuoteRequests } from "@/lib/dev-request-store";
 import { sendQuoteRequestReceivedEmail, sendInternalQuoteRequestNotification } from "@/lib/services/email";
@@ -297,7 +298,11 @@ export async function POST(request: Request) {
         ? {
             id: `dev-prescription-${Date.now()}`,
             requestId,
-            fileName: validatedPrescription.fileName,
+            fileName: buildSystemDocumentFileName({
+              type: "prescription",
+              requestNumber,
+              extension: validatedPrescription.extension,
+            }),
             mimeType: validatedPrescription.mimeType,
             fileSize: validatedPrescription.buffer.length,
             storageKey: null,

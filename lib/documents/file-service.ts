@@ -1,6 +1,10 @@
 import { prisma } from "@/lib/prisma";
 import type { ClientDocumentKind } from "@/lib/client-document-type";
 import {
+  buildSystemDocumentFileName,
+  resolveSystemDocumentKind,
+} from "@/lib/documents/file-name";
+import {
   deleteStoredFile,
   readStoredFile,
   replaceStoredFile,
@@ -77,6 +81,34 @@ async function updateDocumentRecord(
   }
 }
 
+async function nextDocumentSequence(
+  category: ManagedDocumentCategory,
+  requestId: string,
+  documentKind?: ClientDocumentKind | null,
+  excludeDocumentId?: string,
+): Promise<number> {
+  switch (category) {
+    case "prescriptions":
+      return prisma.prescription.count({
+        where: { requestId, ...(excludeDocumentId ? { id: { not: excludeDocumentId } } : {}) },
+      }).then((count) => count + 1);
+    case "mandate-documents":
+      return prisma.mandateDocument.count({
+        where: { requestId, ...(excludeDocumentId ? { id: { not: excludeDocumentId } } : {}) },
+      }).then((count) => count + 1);
+    case "client-documents":
+      return prisma.clientDocument.count({
+        where: {
+          requestId,
+          documentKind: documentKind ?? undefined,
+          ...(excludeDocumentId ? { id: { not: excludeDocumentId } } : {}),
+        },
+      }).then((count) => count + 1);
+    default:
+      return 1;
+  }
+}
+
 async function deleteDocumentRecord(
   category: ManagedDocumentCategory,
   documentId: string,
@@ -117,7 +149,7 @@ export function serializeDocumentMeta(
 export async function createStoredDocumentFromBuffer(input: {
   category: ManagedDocumentCategory;
   requestId: string;
-  fileName: string;
+  fileName?: string;
   mimeType: AllowedMimeType;
   extension: AllowedExtension;
   buffer: Buffer;
@@ -127,11 +159,20 @@ export async function createStoredDocumentFromBuffer(input: {
 }): Promise<StoredDocumentRecord> {
   const request = await prisma.quoteRequest.findUnique({
     where: { id: input.requestId },
-    select: { id: true },
+    select: { id: true, requestNumber: true, customerId: true },
   });
   if (!request) {
     throw new DocumentServiceError("Solicitud no encontrada.", 404);
   }
+
+  const sequence = await nextDocumentSequence(input.category, input.requestId, input.documentKind);
+  const fileName = buildSystemDocumentFileName({
+    type: resolveSystemDocumentKind(input.category, input.documentKind),
+    requestNumber: request.requestNumber,
+    productName: input.customLabel,
+    extension: input.extension,
+    sequence,
+  });
 
   let storageKey: string | null = null;
 
@@ -148,8 +189,8 @@ export async function createStoredDocumentFromBuffer(input: {
         return prisma.prescription.create({
           data: {
             requestId: input.requestId,
-            customerId: input.customerId ?? null,
-            fileName: input.fileName,
+            customerId: input.customerId ?? request.customerId,
+            fileName,
             mimeType: input.mimeType,
             fileSize: input.buffer.length,
             storageKey,
@@ -160,7 +201,7 @@ export async function createStoredDocumentFromBuffer(input: {
         return prisma.clientDocument.create({
           data: {
             requestId: input.requestId,
-            fileName: input.fileName,
+            fileName,
             mimeType: input.mimeType,
             fileSize: input.buffer.length,
             storageKey,
@@ -173,7 +214,7 @@ export async function createStoredDocumentFromBuffer(input: {
         return prisma.mandateDocument.create({
           data: {
             requestId: input.requestId,
-            fileName: input.fileName,
+            fileName,
             mimeType: input.mimeType,
             fileSize: input.buffer.length,
             storageKey,
@@ -200,11 +241,10 @@ export async function createStoredDocument(
     throw new DocumentServiceError(validation.error, 400);
   }
 
-  const { buffer, fileName, mimeType, extension } = validation.value;
+  const { buffer, mimeType, extension } = validation.value;
   return createStoredDocumentFromBuffer({
     category,
     requestId,
-    fileName,
     mimeType,
     extension,
     buffer,
@@ -249,7 +289,19 @@ export async function replaceStoredDocument(
     throw new DocumentServiceError(validation.error, 400);
   }
 
-  const { buffer, fileName, mimeType, extension } = validation.value;
+  const { buffer, mimeType, extension } = validation.value;
+  const request = await prisma.quoteRequest.findUnique({
+    where: { id: record.requestId },
+    select: { requestNumber: true },
+  });
+  const sequence = await nextDocumentSequence(category, record.requestId, record.documentKind, record.id);
+  const fileName = buildSystemDocumentFileName({
+    type: resolveSystemDocumentKind(category, record.documentKind),
+    requestNumber: request?.requestNumber,
+    productName: record.customLabel,
+    extension,
+    sequence,
+  });
   let nextStorageKey: string | null = null;
 
   try {

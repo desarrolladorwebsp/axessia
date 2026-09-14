@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { useParams } from "next/navigation";
@@ -23,7 +23,9 @@ import { ErrorState, EmptyState } from "../../components/States";
 import StatusBadge, { type StatusTone } from "../../components/StatusBadge";
 import Avatar from "../../components/Avatar";
 import MetricCard from "../../components/MetricCard";
+import { PrimaryButton } from "../../components/Buttons";
 import { quoteStatusLabels, quoteStatusTones } from "../../solicitudes/[id]/ViewQuoteModal";
+import AddCustomerDocumentModal, { type CustomerDocumentUploadCategory } from "./AddCustomerDocumentModal";
 
 type CustomerStatus = "Activo" | "En proceso" | "Pendiente" | "Finalizado";
 type DocumentCategory = "prescription" | "mandate" | "related";
@@ -127,10 +129,10 @@ const eventTypeLabels: Record<string, string> = {
   CUSTOMER_COMMENT: "Comentario del cliente",
 };
 
-const documentGroups: Array<{ category: DocumentCategory; title: string; empty: string }> = [
-  { category: "prescription", title: "Recetas", empty: "No hay recetas asociadas a este cliente." },
-  { category: "mandate", title: "Mandatos", empty: "No hay mandatos asociados a este cliente." },
-  { category: "related", title: "Documentos relacionados", empty: "No hay otros documentos asociados." },
+const documentGroups: Array<{ category: DocumentCategory; title: string; empty: string; action: string }> = [
+  { category: "prescription", title: "Recetas", empty: "No hay recetas asociadas a este cliente.", action: "Agregar receta" },
+  { category: "mandate", title: "Mandatos", empty: "No hay mandatos asociados a este cliente.", action: "Agregar mandato" },
+  { category: "related", title: "Documentos relacionados", empty: "No hay otros documentos asociados.", action: "Agregar documento" },
 ];
 
 function formatDate(value: string) {
@@ -200,26 +202,27 @@ export default function CustomerDetailPage() {
   const [error, setError] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [tab, setTab] = useState<TabId>("solicitudes");
+  const [uploadCategory, setUploadCategory] = useState<CustomerDocumentUploadCategory | null>(null);
+
+  const loadCustomer = useCallback(async (showSkeleton = true) => {
+    try {
+      if (showSkeleton) setIsLoading(true);
+      setError("");
+      const response = await fetch(`/api/customers/${params.id}`, { cache: "no-store" });
+      if (!response.ok) {
+        throw new Error(response.status === 404 ? "El cliente no existe o fue eliminado." : "No fue posible cargar el cliente.");
+      }
+      setData((await response.json()) as CustomerDetailResponse);
+    } catch (loadError) {
+      setError(loadError instanceof Error ? loadError.message : "Error desconocido");
+    } finally {
+      setIsLoading(false);
+    }
+  }, [params.id]);
 
   useEffect(() => {
-    const loadCustomer = async () => {
-      try {
-        setIsLoading(true);
-        setError("");
-        const response = await fetch(`/api/customers/${params.id}`, { cache: "no-store" });
-        if (!response.ok) {
-          throw new Error(response.status === 404 ? "El cliente no existe o fue eliminado." : "No fue posible cargar el cliente.");
-        }
-        setData((await response.json()) as CustomerDetailResponse);
-      } catch (loadError) {
-        setError(loadError instanceof Error ? loadError.message : "Error desconocido");
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     void loadCustomer();
-  }, [params.id]);
+  }, [loadCustomer]);
 
   const nameParts = useMemo(() => splitStoredName(data?.customer.name ?? ""), [data?.customer.name]);
 
@@ -437,8 +440,20 @@ export default function CustomerDetailPage() {
               const items = documents.filter((document) => document.category === group.category);
               return (
                 <Panel key={group.category}>
-                  <h2 className="font-display text-base font-extrabold text-[var(--navy)]">{group.title}</h2>
-                  <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{items.length} archivo{items.length === 1 ? "" : "s"}</p>
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h2 className="font-display text-base font-extrabold text-[var(--navy)]">{group.title}</h2>
+                      <p className="mt-0.5 text-xs text-[var(--text-secondary)]">{items.length} archivo{items.length === 1 ? "" : "s"}</p>
+                    </div>
+                    <PrimaryButton
+                      size="sm"
+                      onClick={() => setUploadCategory(group.category)}
+                      disabled={requests.length === 0}
+                      title={requests.length === 0 ? "Crea una solicitud antes de asociar documentos" : group.action}
+                    >
+                      + Agregar
+                    </PrimaryButton>
+                  </div>
                   {items.length === 0 ? (
                     <p className="mt-4 rounded-xl border border-dashed border-[var(--border)] bg-[var(--background)] p-4 text-sm text-[var(--text-secondary)]">{group.empty}</p>
                   ) : (
@@ -507,6 +522,17 @@ export default function CustomerDetailPage() {
           </Panel>
         )}
       </div>
+
+      {uploadCategory ? (
+        <AddCustomerDocumentModal
+          open
+          category={uploadCategory}
+          customerId={customer.id}
+          requests={requests}
+          onClose={() => setUploadCategory(null)}
+          onUploaded={() => void loadCustomer(false)}
+        />
+      ) : null}
     </div>
   );
 }

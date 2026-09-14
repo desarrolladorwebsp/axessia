@@ -6,6 +6,10 @@ import {
   validateClientDocumentClassification,
 } from "@/lib/client-document-type";
 import {
+  buildSystemDocumentFileName,
+  resolveSystemDocumentKind,
+} from "@/lib/documents/file-name";
+import {
   createStoredDocument,
   DocumentServiceError,
   serializeDocumentMeta,
@@ -52,10 +56,19 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       const records = await readDevQuoteRequests();
       const index = records.findIndex((record) => record.id === id);
       if (index === -1) return NextResponse.json({ error: "Solicitud no encontrada." }, { status: 404 });
+      const existingRelated = (records[index].clientDocuments ?? []).filter(
+        (document) => document.documentKind === classification.documentKind,
+      );
       const document = {
         id: `dev-document-${Date.now()}`,
         requestId: id,
-        fileName: fileEntry.name,
+        fileName: buildSystemDocumentFileName({
+          type: resolveSystemDocumentKind("client-documents", classification.documentKind),
+          requestNumber: records[index].requestNumber,
+          productName: classification.customLabel,
+          extension: fileEntry.name.split(".").pop() ?? "",
+          sequence: existingRelated.length + 1,
+        }),
         mimeType: fileEntry.type || "application/octet-stream",
         fileSize: fileEntry.size,
         storageKey: null,

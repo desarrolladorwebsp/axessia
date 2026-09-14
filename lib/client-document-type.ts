@@ -52,7 +52,7 @@ export function validateClientDocumentClassification(input: {
     return { ok: true, documentKind: input.documentKind, customLabel: null };
   }
   if (input.customLabel.length < 2) {
-    return { ok: false, error: "Indica el nombre o tipo del documento." };
+    return { ok: false, error: "Indica el nombre del documento." };
   }
   return { ok: true, documentKind: input.documentKind, customLabel: input.customLabel };
 }
