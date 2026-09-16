@@ -23,6 +23,8 @@ export type QuoteItemDetail = {
   manufacturer: string | null;
   originCountry: string | null;
   supplierCountry: string | null;
+  supplierId?: string | null;
+  supplier?: { id: string; name: string } | null;
   quantity: number;
   sanitaryRegistry: string | null;
   condition: "AVAILABLE" | "SPECIAL_IMPORT" | null;
@@ -156,16 +158,16 @@ export default function ViewQuoteModal({
                   <DetailField label="Marca" value={item.brand ?? null} />
                   <DetailField label="Modelo o referencia" value={item.model ?? null} />
                   <DetailField label="Descripción" value={item.description ?? null} />
-                  <DetailField label="Fabricante" value={item.manufacturer} />
                 </>
               ) : (
                 <>
                   <DetailField label="Forma farmacéutica" value={item.pharmaceuticalForm} />
                   <DetailField label="Presentación" value={item.presentation} />
                   <DetailField label="Unidades por presentación" value={item.unitsPerPackage ? String(item.unitsPerPackage) : null} />
-                  <DetailField label="Laboratorio / fabricante" value={item.manufacturer} />
                 </>
               )}
+              <DetailField label="Proveedor" value={item.supplier?.name ?? null} />
+              <DetailField label="Laboratorio / fabricante" value={item.manufacturer} />
               <DetailField label="País de origen" value={item.originCountry} />
               <DetailField label="País del proveedor" value={item.supplierCountry} />
               <DetailField label="Registro sanitario" value={item.sanitaryRegistry} />

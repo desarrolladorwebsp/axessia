@@ -140,7 +140,45 @@ model Customer {
   updatedAt         DateTime       @updatedAt
   requests          QuoteRequest[]
   prescriptions     Prescription[]
-  quotes            Quote[]
+  quotes                     Quote[]
+  customerEmailNotifications CustomerEmailNotification[]
+  passwordResetTokens        CustomerPasswordResetToken[]
+}
+
+model CustomerPasswordResetToken {
+  id         String    @id @default(cuid())
+  customerId String
+  tokenHash  String    @unique
+  expiresAt  DateTime
+  usedAt     DateTime?
+  createdAt  DateTime  @default(now())
+  customer   Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId, usedAt, expiresAt])
+}
+
+/// Operational supplier registry. Future purchases, quotes and cases can reference `id`.
+model Supplier {
+  id            String      @id @default(cuid())
+  name          String
+  /// Flexible commercial or internal number. Not a Chilean RUT; stores foreign IDs as-is.
+  identifier    String?
+  phone         String?
+  contactName   String?
+  email         String?
+  manufacturer  String?
+  originCountry String?
+  country       String?
+  notes         String?     @db.Text
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  quoteItems    QuoteItem[]
+
+  @@index([name])
+  @@index([identifier])
+  @@index([contactName])
+  @@index([email])
+  @@index([createdAt])
 }
 
 model QuoteRequest {
@@ -175,8 +213,9 @@ model QuoteRequest {
   comments             QuoteRequestComment[]
   internalNotes        QuoteRequestNote[]
   events               QuoteRequestEvent[]
-  notifications        Notification[]
-  payments             Payment[]
+  notifications              Notification[]
+  payments                   Payment[]
+  customerEmailNotifications CustomerEmailNotification[]
 
   @@index([customerId])
   @@index([status])
@@ -243,6 +282,19 @@ enum NotificationType {
   QUOTE_REJECTED
 }
 
+enum CustomerEmailNotificationType {
+  QUOTE_PENDING_REMINDER
+  QUOTE_EXPIRING_SOON
+  REQUEST_COMPLETED
+}
+
+enum CustomerEmailNotificationStatus {
+  PENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
 model Prescription {
   id         String       @id @default(cuid())
   requestId  String
@@ -304,9 +356,10 @@ model Quote {
   updatedAt            DateTime              @updatedAt
   customer             Customer              @relation(fields: [customerId], references: [id], onDelete: Restrict)
   request              QuoteRequest          @relation(fields: [requestId], references: [id], onDelete: Restrict)
-  items                QuoteItem[]
-  quoteRequestComments QuoteRequestComment[]
-  payments             Payment[]
+  items                      QuoteItem[]
+  quoteRequestComments       QuoteRequestComment[]
+  payments                   Payment[]
+  customerEmailNotifications CustomerEmailNotification[]
 
   @@unique([requestId, version])
   @@index([requestId])
@@ -355,6 +408,7 @@ model QuoteItem {
   manufacturer       String?
   originCountry      String?
   supplierCountry    String?
+  supplierId         String?
   quantity           Int
   sanitaryRegistry   String?
   condition          QuoteItemCondition?
@@ -364,8 +418,34 @@ model QuoteItem {
   totalPrice         Decimal?            @db.Decimal(12, 2)
   createdAt          DateTime            @default(now())
   quote              Quote               @relation(fields: [quoteId], references: [id], onDelete: Cascade)
+  supplier           Supplier?           @relation(fields: [supplierId], references: [id], onDelete: Restrict)
 
   @@index([quoteId])
+  @@index([supplierId])
+}
+
+model CustomerEmailNotification {
+  id                String                            @id @default(cuid())
+  occurrenceKey     String                            @unique
+  type              CustomerEmailNotificationType
+  status            CustomerEmailNotificationStatus   @default(PENDING)
+  customerId        String?
+  quoteId           String?
+  requestId         String?
+  recipientEmail    String
+  providerMessageId String?
+  errorMessage      String?                           @db.Text
+  sentAt            DateTime?
+  createdAt         DateTime                          @default(now())
+  updatedAt         DateTime                          @updatedAt
+  customer          Customer?                         @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  quote             Quote?                            @relation(fields: [quoteId], references: [id], onDelete: SetNull)
+  request           QuoteRequest?                     @relation(fields: [requestId], references: [id], onDelete: SetNull)
+
+  @@index([customerId, createdAt])
+  @@index([quoteId, type, status])
+  @@index([requestId, type, status])
+  @@index([status, createdAt])
 }
 
 model QuoteRequestComment {

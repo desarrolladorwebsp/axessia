@@ -2,65 +2,26 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { AlertTriangle, CheckCircle2, Loader2, Plus, Send, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, Loader2, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import Modal from "../../components/Modal";
 import { PrimaryButton, SecondaryButton } from "../../components/Buttons";
 import { defaultQuoteValidUntilDate, formatLocalDate } from "@/lib/quote-items";
 import { isMedicalDevice, type ProductType } from "@/lib/product-type";
 import type { QuoteDetail } from "./ViewQuoteModal";
-
-type MedicationSeed = { commercialName: string; activeIngredient: string; concentration: string; tabletQuantity: number | null };
-type DeviceSeed = { name: string; brand: string | null; model: string | null; quantity: number | null; description: string | null };
-
-export type QuoteDraftItem = {
-  productType: ProductType;
-  productName: string;
-  activeIngredient: string;
-  concentration: string;
-  pharmaceuticalForm: string;
-  brand: string;
-  model: string;
-  description: string;
-  presentation: string;
-  unitsPerPackage: string;
-  manufacturer: string;
-  originCountry: string;
-  supplierCountry: string;
-  quantity: string;
-  sanitaryRegistry: string;
-  condition: "" | "AVAILABLE" | "SPECIAL_IMPORT";
-  batchNumber: string;
-  expirationDate: string;
-  unitPrice: string;
-};
-
-const emptyItem = (productType: ProductType, seed?: MedicationSeed | DeviceSeed): QuoteDraftItem => {
-  const deviceSeed = seed && "name" in seed ? seed : null;
-  const medicationSeed = seed && "commercialName" in seed ? seed : null;
-  return {
-    productType,
-    productName: deviceSeed?.name ?? medicationSeed?.commercialName ?? "",
-    activeIngredient: medicationSeed?.activeIngredient ?? "",
-    concentration: medicationSeed?.concentration ?? "",
-    pharmaceuticalForm: "",
-    brand: deviceSeed?.brand ?? "",
-    model: deviceSeed?.model ?? "",
-    description: deviceSeed?.description ?? "",
-    presentation: "",
-    unitsPerPackage: medicationSeed?.tabletQuantity != null ? String(medicationSeed.tabletQuantity) : "",
-    manufacturer: deviceSeed?.brand ?? "",
-    originCountry: "",
-    supplierCountry: "",
-    quantity: deviceSeed?.quantity != null ? String(deviceSeed.quantity) : "1",
-    sanitaryRegistry: "",
-    condition: "",
-    batchNumber: "",
-    expirationDate: "",
-    unitPrice: "",
-  };
-};
-
-const pharmaceuticalForms = ["Comprimido", "Cápsula", "Ampolla", "Solución", "Jarabe", "Crema", "Otro"];
+import QuoteProductModal from "./QuoteProductModal";
+import {
+  emptyItem,
+  formatClp,
+  isIncompleteQuoteLine,
+  itemTypeLabel,
+  lineAmount,
+  newDraftClientId,
+  quoteMoneyBreakdown,
+  type DeviceSeed,
+  type MedicationSeed,
+  type QuoteDraftItem,
+  type QuoteSupplierOption,
+} from "./quote-draft";
 
 export default function CreateQuoteModal({
   open,
@@ -85,9 +46,10 @@ export default function CreateQuoteModal({
 }) {
   const isEditing = Boolean(editingQuote);
   const deviceQuote = isMedicalDevice(productType);
-  const [items, setItems] = useState<QuoteDraftItem[]>([emptyItem(productType)]);
+  const [items, setItems] = useState<QuoteDraftItem[]>([]);
   const [validUntil, setValidUntil] = useState("");
   const [estimatedShippingDays, setEstimatedShippingDays] = useState("");
+  const [notes, setNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
@@ -98,11 +60,15 @@ export default function CreateQuoteModal({
   const [confirmError, setConfirmError] = useState("");
   const [lastAction, setLastAction] = useState<"create" | "create-send">("create");
   const [createdQuote, setCreatedQuote] = useState<QuoteDetail | null>(null);
+  const [suppliers, setSuppliers] = useState<QuoteSupplierOption[]>([]);
+  const [productModalOpen, setProductModalOpen] = useState(false);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
     const seededItems: QuoteDraftItem[] = editingQuote
       ? editingQuote.items.map((item) => ({
+          clientId: item.id || newDraftClientId(),
           productType: item.productType ?? productType,
           productName: item.productName,
           activeIngredient: item.activeIngredient ?? "",
@@ -113,6 +79,7 @@ export default function CreateQuoteModal({
           description: item.description ?? "",
           presentation: item.presentation ?? "",
           unitsPerPackage: item.unitsPerPackage != null ? String(item.unitsPerPackage) : "",
+          supplierId: item.supplierId ?? item.supplier?.id ?? "",
           manufacturer: item.manufacturer ?? "",
           originCountry: item.originCountry ?? "",
           supplierCountry: item.supplierCountry ?? "",
@@ -124,13 +91,14 @@ export default function CreateQuoteModal({
           unitPrice: item.unitPrice != null ? String(item.unitPrice) : "",
         }))
       : deviceQuote
-        ? (medicalDevices.length ? medicalDevices.map((device) => emptyItem("MEDICAL_DEVICE", device)) : [emptyItem("MEDICAL_DEVICE")])
-        : (medications.length ? medications.map((medication) => emptyItem("MEDICATION", medication)) : [emptyItem("MEDICATION")]);
+        ? medicalDevices.map((device) => emptyItem("MEDICAL_DEVICE", device))
+        : medications.map((medication) => emptyItem("MEDICATION", medication));
     const defaultValidUntil = editingQuote?.validUntil ? editingQuote.validUntil.slice(0, 10) : defaultQuoteValidUntilDate();
     const defaultShippingDays = editingQuote?.estimatedShippingDays != null ? String(editingQuote.estimatedShippingDays) : "";
     // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the draft form each time the modal opens
     setValidUntil(defaultValidUntil);
     setEstimatedShippingDays(defaultShippingDays);
+    setNotes("");
     setItems(seededItems);
     setError("");
     setShowDiscardConfirm(false);
@@ -138,19 +106,32 @@ export default function CreateQuoteModal({
     setConfirmStage("idle");
     setConfirmError("");
     setCreatedQuote(null);
-    initialSnapshot.current = JSON.stringify({ items: seededItems, validUntil: defaultValidUntil, estimatedShippingDays: defaultShippingDays });
+    setProductModalOpen(false);
+    setEditingItemId(null);
+    initialSnapshot.current = JSON.stringify({ items: seededItems, validUntil: defaultValidUntil, estimatedShippingDays: defaultShippingDays, notes: "" });
   }, [open, productType, medications, medicalDevices, editingQuote, deviceQuote]);
 
-  const updateItem = (index: number, patch: Partial<QuoteDraftItem>) => {
-    setItems((current) => current.map((item, itemIndex) => (itemIndex === index ? { ...item, ...patch } : item)));
-  };
+  useEffect(() => {
+    if (!open) return;
+    const loadSuppliers = async () => {
+      try {
+        const response = await fetch("/api/suppliers?forSelect=1");
+        const result = (await response.json()) as { suppliers?: QuoteSupplierOption[]; error?: string };
+        if (!response.ok) throw new Error(result.error || "No fue posible cargar los proveedores");
+        setSuppliers(result.suppliers ?? []);
+      } catch {
+        setSuppliers([]);
+      }
+    };
+    void loadSuppliers();
+  }, [open]);
 
-  const addItem = () => setItems((current) => [...current, emptyItem(productType)]);
-  const removeItem = (index: number) => setItems((current) => current.filter((_, itemIndex) => itemIndex !== index));
+  const removeItem = (clientId: string) => setItems((current) => current.filter((item) => item.clientId !== clientId));
 
-  const total = items.reduce((sum, item) => sum + (Number(item.quantity) || 0) * (Number(item.unitPrice) || 0), 0);
-  const isDirty = () => JSON.stringify({ items, validUntil, estimatedShippingDays }) !== initialSnapshot.current;
+  const { subtotal, iva, total } = quoteMoneyBreakdown(items);
+  const isDirty = () => JSON.stringify({ items, validUntil, estimatedShippingDays, notes }) !== initialSnapshot.current;
   const isBusy = confirmStage === "creating" || confirmStage === "sending";
+  const editingItem = items.find((item) => item.clientId === editingItemId) ?? null;
 
   const requestClose = () => {
     if (isSubmitting || isBusy) return;
@@ -162,8 +143,10 @@ export default function CreateQuoteModal({
   };
 
   const validateItemsForFinalize = () => {
+    if (!items.length) return "Agrega al menos un producto a la cotización";
     const invalidItem = items.find((item) => !item.productName.trim() || !Number(item.quantity) || Number(item.quantity) <= 0 || item.unitPrice === "" || Number(item.unitPrice) < 0);
-    if (invalidItem) return "Completa nombre comercial, cantidad solicitada y precio unitario en todos los productos";
+    if (invalidItem) return "Completa nombre, cantidad y precio unitario en todos los productos";
+    if (items.some((item) => !item.supplierId)) return "Selecciona un proveedor en todos los productos";
     const days = Number(estimatedShippingDays);
     if (!estimatedShippingDays || !Number.isInteger(days) || days <= 0) return "Indica el tiempo estimado de envío en días hábiles";
     return "";
@@ -199,6 +182,10 @@ export default function CreateQuoteModal({
 
   const submit = async (asDraft: boolean) => {
     if (isSubmitting) return;
+    if (!items.length) {
+      setError("Agrega al menos un producto para guardar el borrador");
+      return;
+    }
     if (asDraft && items.some((item) => !item.productName.trim())) {
       setError("Cada producto necesita al menos un nombre comercial para guardarse como borrador");
       return;
@@ -228,7 +215,6 @@ export default function CreateQuoteModal({
   };
 
   const createFinalQuote = (): Promise<QuoteDetail> => saveQuote(false);
-
 
   const sendCreatedQuote = async (quoteId: string) => {
     const response = await fetch(`/api/quotes/${quoteId}/send`, { method: "POST" });
@@ -308,6 +294,26 @@ export default function CreateQuoteModal({
     }
   };
 
+  const openAddProduct = () => {
+    setEditingItemId(null);
+    setProductModalOpen(true);
+  };
+
+  const openEditProduct = (clientId: string) => {
+    setEditingItemId(clientId);
+    setProductModalOpen(true);
+  };
+
+  const saveProduct = (item: QuoteDraftItem) => {
+    setItems((current) => {
+      const exists = current.some((row) => row.clientId === item.clientId);
+      return exists ? current.map((row) => (row.clientId === item.clientId ? item : row)) : [...current, item];
+    });
+    setProductModalOpen(false);
+    setEditingItemId(null);
+    setError("");
+  };
+
   return (
     <>
     <Modal
@@ -315,21 +321,18 @@ export default function CreateQuoteModal({
       onClose={requestClose}
       dismissible={false}
       title={isEditing ? "Editar cotización" : "Nueva cotización"}
-      description={isEditing ? `Cliente: ${customerName} · ${editingQuote?.quoteNumber || `Borrador v${editingQuote?.version}`}` : `Cliente: ${customerName} · Número generado automáticamente`}
+      titleClassName="bg-gradient-to-r from-[var(--cyan)] via-[var(--blue)] to-[var(--purple)] bg-clip-text text-transparent"
       maxWidthClassName="max-w-5xl"
       footer={
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm font-extrabold text-[var(--navy)]">Total: ${total.toLocaleString("es-CL")}</p>
-          <div className="flex flex-wrap items-center gap-2">
-            {error && <p className="text-xs font-semibold text-rose-600">{error}</p>}
-            <SecondaryButton size="sm" onClick={requestClose} disabled={isSubmitting}>Cancelar</SecondaryButton>
-            <SecondaryButton size="sm" onClick={() => submit(true)} disabled={isSubmitting} icon={isSubmitting ? Loader2 : undefined} className={isSubmitting ? "[&_svg]:animate-spin" : ""}>
-              Guardar borrador
-            </SecondaryButton>
-            <PrimaryButton size="sm" onClick={openConfirm} disabled={isSubmitting}>
-              {isEditing ? "Guardar cambios" : "Crear cotización"}
-            </PrimaryButton>
-          </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          {error && <p className="mr-auto text-xs font-semibold text-rose-600">{error}</p>}
+          <SecondaryButton size="sm" onClick={requestClose} disabled={isSubmitting}>Cancelar</SecondaryButton>
+          <SecondaryButton size="sm" onClick={() => submit(true)} disabled={isSubmitting} icon={isSubmitting ? Loader2 : undefined} className={isSubmitting ? "[&_svg]:animate-spin" : ""}>
+            Guardar borrador
+          </SecondaryButton>
+          <PrimaryButton size="sm" onClick={openConfirm} disabled={isSubmitting}>
+            {isEditing ? "Guardar cambios" : "Crear cotización"}
+          </PrimaryButton>
         </div>
       }
     >
@@ -367,12 +370,13 @@ export default function CreateQuoteModal({
         )}
       </AnimatePresence>
 
-      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-xs font-semibold text-[var(--text-secondary)]">{items.length} producto{items.length === 1 ? "" : "s"} en esta cotización</p>
-        <div className="flex flex-wrap items-end gap-3">
-          <label className="text-xs font-bold text-[var(--navy)]">
+        <div className="flex flex-wrap items-center gap-3">
+          <label className="flex flex-col gap-1 text-xs font-bold text-[var(--navy)] md:flex-row md:items-center md:gap-2">
             Tiempo estimado de envío
-            <span className="mt-1 flex items-center gap-2">
+            <span className="text-rose-600" aria-hidden="true">*</span>
+            <span className="flex items-center gap-2">
               <input
                 type="number"
                 min="1"
@@ -381,147 +385,174 @@ export default function CreateQuoteModal({
                 value={estimatedShippingDays}
                 onChange={(event) => setEstimatedShippingDays(event.target.value)}
                 placeholder="Ej: 10"
+                required
+                aria-required="true"
                 className="block w-24 rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-xs font-semibold outline-none focus:border-[var(--blue)]"
               />
               <span className="whitespace-nowrap text-[10px] font-semibold text-[var(--text-secondary)]">días hábiles</span>
             </span>
           </label>
-          <label className="text-xs font-bold text-[var(--navy)]">
+          <label className="flex flex-col gap-1 text-xs font-bold text-[var(--navy)] md:flex-row md:items-center md:gap-2">
             Vence
+            <span className="text-rose-600" aria-hidden="true">*</span>
             <input
               type="date"
               value={validUntil}
               min={formatLocalDate(new Date())}
               onChange={(event) => setValidUntil(event.target.value)}
-              className="mt-1 block rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-xs font-semibold outline-none focus:border-[var(--blue)]"
+              required
+              aria-required="true"
+              className="block rounded-lg border border-[var(--border)] bg-[var(--background)] px-3 py-2 text-xs font-semibold outline-none focus:border-[var(--blue)]"
             />
           </label>
         </div>
       </div>
 
-      <div className="space-y-4">
-        <AnimatePresence initial={false}>
-          {items.map((item, index) => (
-            <motion.div
-              key={index}
-              layout
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden rounded-xl border border-[var(--border)] bg-[var(--background)] p-4"
-            >
-              <div className="mb-3 flex items-center justify-between">
-                <p className="text-xs font-bold uppercase tracking-wide text-[var(--text-secondary)]">Producto {index + 1}</p>
-                {items.length > 1 && (
-                  <button type="button" onClick={() => removeItem(index)} className="icon-button-small" aria-label={`Eliminar producto ${index + 1}`} title="Eliminar producto">
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </div>
+      <section className="overflow-hidden rounded-2xl border border-[var(--border)] bg-white">
+        <div className="hidden md:block">
+          <table className="w-full text-left">
+            <thead>
+              <tr className="border-b border-[var(--border)] bg-[var(--background)]">
+                {["Nombre", "Tipo", "Cantidad", "Precio", "Total"].map((header) => (
+                  <th key={header} className="px-4 py-3 text-[10px] font-bold uppercase tracking-wide text-[var(--navy)]">{header}</th>
+                ))}
+                <th className="w-28 px-4 py-3 text-right text-[10px] font-bold uppercase tracking-wide text-[var(--navy)]">Acciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              {items.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-xs text-[var(--text-secondary)]">
+                    Aún no hay productos en esta cotización. Agrega un medicamento o un equipo médico.
+                  </td>
+                </tr>
+              ) : (
+                items.map((item, index) => (
+                  <motion.tr
+                    key={item.clientId}
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    transition={{ delay: index * 0.03 }}
+                    className="border-b border-[var(--border)] last:border-0 hover:bg-[var(--background)]"
+                  >
+                    <td className="px-4 py-3">
+                      <p className="text-xs font-bold text-[var(--navy)]">{item.productName || "Sin nombre"}</p>
+                      {isIncompleteQuoteLine(item) && (
+                        <p className="mt-0.5 text-[10px] font-semibold text-amber-600">Faltan datos para finalizar</p>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="inline-flex rounded-full bg-[var(--background)] px-2 py-0.5 text-[10px] font-bold text-[var(--blue)]">
+                        {itemTypeLabel(item)}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-xs font-semibold text-[var(--navy)]">{item.quantity || "—"}</td>
+                    <td className="px-4 py-3 text-xs font-semibold text-[var(--navy)]">{item.unitPrice === "" ? "—" : formatClp(Number(item.unitPrice) || 0)}</td>
+                    <td className="px-4 py-3 text-xs font-extrabold text-[var(--navy)]">{formatClp(lineAmount(item))}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-1">
+                        <button type="button" className="icon-button-small" onClick={() => openEditProduct(item.clientId)} aria-label={`Editar ${item.productName || "producto"}`} title="Editar">
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button type="button" className="icon-button-small" onClick={() => removeItem(item.clientId)} aria-label={`Eliminar ${item.productName || "producto"}`} title="Eliminar">
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    </td>
+                  </motion.tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <Field label={deviceQuote ? "Nombre del dispositivo" : "Nombre comercial"}>
-                  <input value={item.productName} onChange={(event) => updateItem(index, { productName: event.target.value })} className="field-input" />
-                </Field>
-                {deviceQuote ? (
-                  <>
-                    <Field label="Marca">
-                      <input value={item.brand} onChange={(event) => updateItem(index, { brand: event.target.value, manufacturer: event.target.value || item.manufacturer })} className="field-input" />
-                    </Field>
-                    <Field label="Modelo o referencia">
-                      <input value={item.model} onChange={(event) => updateItem(index, { model: event.target.value })} className="field-input" />
-                    </Field>
-                    <Field label="Fabricante">
-                      <input value={item.manufacturer} onChange={(event) => updateItem(index, { manufacturer: event.target.value })} className="field-input" />
-                    </Field>
-                  </>
-                ) : (
-                  <>
-                    <Field label="Principio activo">
-                      <input value={item.activeIngredient} onChange={(event) => updateItem(index, { activeIngredient: event.target.value })} className="field-input" />
-                    </Field>
-                    <Field label="Concentración">
-                      <input value={item.concentration} onChange={(event) => updateItem(index, { concentration: event.target.value })} className="field-input" />
-                    </Field>
-                    <Field label="Forma farmacéutica">
-                      <select value={item.pharmaceuticalForm} onChange={(event) => updateItem(index, { pharmaceuticalForm: event.target.value })} className="field-input">
-                        <option value="">Seleccionar</option>
-                        {pharmaceuticalForms.map((form) => <option key={form} value={form}>{form}</option>)}
-                      </select>
-                    </Field>
-                  </>
-                )}
-
-                {deviceQuote ? (
-                  <Field label="Descripción o características">
-                    <input value={item.description} onChange={(event) => updateItem(index, { description: event.target.value })} className="field-input" />
-                  </Field>
-                ) : (
-                  <>
-                    <Field label="Presentación">
-                      <input value={item.presentation} onChange={(event) => updateItem(index, { presentation: event.target.value })} placeholder="Caja de 30 comprimidos" className="field-input" />
-                    </Field>
-                    <Field label="Unidades por presentación">
-                      <input type="number" min="1" value={item.unitsPerPackage} onChange={(event) => updateItem(index, { unitsPerPackage: event.target.value })} placeholder="30" className="field-input" />
-                    </Field>
-                    <Field label="Laboratorio / fabricante">
-                      <input value={item.manufacturer} onChange={(event) => updateItem(index, { manufacturer: event.target.value })} className="field-input" />
-                    </Field>
-                  </>
-                )}
-                <Field label="País de origen">
-                  <input value={item.originCountry} onChange={(event) => updateItem(index, { originCountry: event.target.value })} className="field-input" />
-                </Field>
-
-                <Field label="País del proveedor">
-                  <input value={item.supplierCountry} onChange={(event) => updateItem(index, { supplierCountry: event.target.value })} className="field-input" />
-                </Field>
-                <Field label="Registro sanitario">
-                  <input value={item.sanitaryRegistry} onChange={(event) => updateItem(index, { sanitaryRegistry: event.target.value })} placeholder="Si corresponde" className="field-input" />
-                </Field>
-                <Field label="Condición">
-                  <select value={item.condition} onChange={(event) => updateItem(index, { condition: event.target.value as QuoteDraftItem["condition"] })} className="field-input">
-                    <option value="">Seleccionar</option>
-                    <option value="AVAILABLE">{deviceQuote ? "Dispositivo disponible" : "Medicamento disponible"}</option>
-                    <option value="SPECIAL_IMPORT">Importación especial</option>
-                  </select>
-                </Field>
-                <Field label="Lote">
-                  <input value={item.batchNumber} onChange={(event) => updateItem(index, { batchNumber: event.target.value })} placeholder="Si ya está identificado" className="field-input" />
-                </Field>
-
-                <Field label="Fecha de vencimiento">
-                  <input type="date" value={item.expirationDate} onChange={(event) => updateItem(index, { expirationDate: event.target.value })} className="field-input" />
-                </Field>
-                <Field label="Cantidad solicitada">
-                  <input type="number" min="1" value={item.quantity} onChange={(event) => updateItem(index, { quantity: event.target.value })} className="field-input" />
-                </Field>
-                <Field label="Precio unitario">
-                  <input type="number" min="0" step="0.01" value={item.unitPrice} onChange={(event) => updateItem(index, { unitPrice: event.target.value })} className="field-input" />
-                </Field>
-                <div className="flex flex-col justify-end">
-                  <p className="text-[10px] font-bold uppercase text-[var(--text-secondary)]">Subtotal</p>
-                  <p className="text-sm font-extrabold text-[var(--navy)]">${((Number(item.quantity) || 0) * (Number(item.unitPrice) || 0)).toLocaleString("es-CL")}</p>
+        <div className="divide-y divide-[var(--border)] md:hidden">
+          {items.length === 0 ? (
+            <p className="px-4 py-8 text-center text-xs text-[var(--text-secondary)]">
+              Aún no hay productos en esta cotización. Agrega un medicamento o un equipo médico.
+            </p>
+          ) : (
+            items.map((item) => (
+              <article key={item.clientId} className="p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="truncate text-xs font-bold text-[var(--navy)]">{item.productName || "Sin nombre"}</p>
+                    <p className="mt-1 text-[10px] font-bold text-[var(--blue)]">{itemTypeLabel(item)}</p>
+                    <p className="mt-2 text-[11px] text-[var(--text-secondary)]">
+                      Cant. {item.quantity || "—"} · Precio {item.unitPrice === "" ? "—" : formatClp(Number(item.unitPrice) || 0)}
+                    </p>
+                    <p className="mt-1 text-xs font-extrabold text-[var(--navy)]">{formatClp(lineAmount(item))}</p>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button type="button" className="icon-button-small" onClick={() => openEditProduct(item.clientId)} aria-label={`Editar ${item.productName || "producto"}`} title="Editar">
+                      <Pencil className="h-3.5 w-3.5" />
+                    </button>
+                    <button type="button" className="icon-button-small" onClick={() => removeItem(item.clientId)} aria-label={`Eliminar ${item.productName || "producto"}`} title="Eliminar">
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </motion.div>
-          ))}
-        </AnimatePresence>
-      </div>
+              </article>
+            ))
+          )}
+        </div>
+      </section>
 
-      <button type="button" onClick={addItem} className="mt-4 inline-flex items-center gap-2 rounded-xl border border-dashed border-[var(--purple)] px-3 py-2 text-xs font-bold text-[var(--purple)] transition hover:bg-violet-50">
-        <Plus className="h-3.5 w-3.5" />Agregar producto
+      <button type="button" onClick={openAddProduct} className="mt-4 inline-flex items-center gap-2 rounded-xl border border-dashed border-[var(--purple)] px-3 py-2 text-xs font-bold text-[var(--purple)] transition hover:bg-violet-50">
+        <Plus className="h-3.5 w-3.5" />Agregar
       </button>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[minmax(0,1fr)_280px]">
+        <label className="block text-[10px] font-bold uppercase tracking-wide text-[var(--text-secondary)]">
+          Observación
+          <textarea
+            value={notes}
+            onChange={(event) => setNotes(event.target.value)}
+            rows={3}
+            placeholder="Notas internas de esta cotización"
+            className="field-input mt-1 min-h-[84px] resize-y"
+          />
+        </label>
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--background)] p-4">
+          <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
+            <span>Total</span>
+            <span className="font-semibold text-[var(--navy)]">{formatClp(subtotal)}</span>
+          </div>
+          <div className="mt-2 flex items-center justify-between text-xs text-[var(--text-secondary)]">
+            <span>IVA (19%)</span>
+            <span className="font-semibold text-[var(--navy)]">{formatClp(iva)}</span>
+          </div>
+          <div className="mt-3 flex items-center justify-between border-t border-[var(--border)] pt-3">
+            <span className="text-xs font-extrabold text-[var(--navy)]">Total cotización</span>
+            <span className="text-sm font-extrabold text-[var(--navy)]">{formatClp(total)}</span>
+          </div>
+        </div>
+      </div>
     </Modal>
+
+    <QuoteProductModal
+      open={productModalOpen}
+      editingItem={editingItem}
+      defaultProductType={productType}
+      medications={medications}
+      medicalDevices={medicalDevices}
+      existingItems={items}
+      suppliers={suppliers}
+      onClose={() => {
+        setProductModalOpen(false);
+        setEditingItemId(null);
+      }}
+      onSave={saveProduct}
+    />
 
     <Modal
       open={confirmOpen}
       onClose={cancelConfirm}
       dismissible={false}
       title={isEditing ? "Confirmar cambios de la cotización" : "Confirmar creación de cotización"}
-      description={`Cliente: ${customerName} · Total: $${total.toLocaleString("es-CL")}`}
+      description={`Cliente: ${customerName} · Total cotización: ${formatClp(total)}`}
       maxWidthClassName="max-w-md"
+      zClassName="z-[70]"
       footer={
         confirmStage === "idle" ? (
           <div className="flex flex-wrap justify-end gap-2">
@@ -579,14 +610,5 @@ export default function CreateQuoteModal({
       )}
     </Modal>
     </>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="block text-[10px] font-bold uppercase text-[var(--text-secondary)]">
-      {label}
-      <div className="mt-1">{children}</div>
-    </label>
   );
 }

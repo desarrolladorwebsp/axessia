@@ -44,6 +44,7 @@ export type QuotePdfData = {
     phone?: string | null;
   };
   items: QuotePdfItem[];
+  includeInternalSourcing?: boolean;
 };
 
 const navy = rgb(7 / 255, 30 / 255, 65 / 255);
@@ -152,16 +153,20 @@ function addUriLink(page: PDFPage, url: string, x: number, y: number, width: num
   page.node.addAnnot(annotation);
 }
 
-function itemDetailLines(item: QuotePdfItem) {
+function itemDetailLines(item: QuotePdfItem, includeInternalSourcing = false) {
+  const sourcing = includeInternalSourcing
+    ? joinParts([
+        item.manufacturer ? (item.productType === "MEDICAL_DEVICE" ? `Fabricante: ${item.manufacturer}` : `Lab. ${item.manufacturer}`) : null,
+        item.originCountry ? `Origen: ${item.originCountry}` : null,
+        item.supplierCountry ? `Proveedor: ${item.supplierCountry}` : null,
+      ])
+    : "";
+
   if (item.productType === "MEDICAL_DEVICE") {
     return [
       joinParts([item.brand ? `Marca: ${item.brand}` : null, item.model ? `Modelo: ${item.model}` : null]) || "Dispositivo médico",
       item.description?.trim() || "",
-      joinParts([
-        item.manufacturer ? `Fabricante: ${item.manufacturer}` : null,
-        item.originCountry ? `Origen: ${item.originCountry}` : null,
-        item.supplierCountry ? `Proveedor: ${item.supplierCountry}` : null,
-      ]),
+      sourcing,
       joinParts([
         item.sanitaryRegistry ? `Reg. sanitario: ${item.sanitaryRegistry}` : null,
         item.condition ? (item.condition === "AVAILABLE" ? "Dispositivo disponible" : conditionLabels[item.condition]) : null,
@@ -177,11 +182,7 @@ function itemDetailLines(item: QuotePdfItem) {
       item.presentation,
       item.unitsPerPackage ? `${item.unitsPerPackage} un. por presentación` : null,
     ]),
-    joinParts([
-      item.manufacturer ? `Lab. ${item.manufacturer}` : null,
-      item.originCountry ? `Origen: ${item.originCountry}` : null,
-      item.supplierCountry ? `Proveedor: ${item.supplierCountry}` : null,
-    ]),
+    sourcing,
     joinParts([
       item.sanitaryRegistry ? `Reg. sanitario: ${item.sanitaryRegistry}` : null,
       item.condition ? conditionLabels[item.condition] : null,
@@ -325,7 +326,7 @@ export async function generateQuotePdf(quote: QuotePdfData) {
 
   quote.items.forEach((item, index) => {
     const nameLines = wrap(item.productName, bold, 9.5, productWidth);
-    const details = itemDetailLines(item).flatMap((line) => wrap(line, regular, 7.5, productWidth));
+    const details = itemDetailLines(item, quote.includeInternalSourcing).flatMap((line) => wrap(line, regular, 7.5, productWidth));
     const blockHeight = 10 + nameLines.length * 12 + details.length * 10 + 10;
 
     if (y - blockHeight < contentBottom) {

@@ -9,14 +9,17 @@ export type ModalProps = {
   onClose: () => void;
   title: string;
   description?: string;
+  titleClassName?: string;
   children: React.ReactNode;
   footer?: React.ReactNode;
   maxWidthClassName?: string;
   /** When false, the modal only closes through an explicit action (close button/footer), never backdrop click or Escape. Defaults to true. */
   dismissible?: boolean;
+  /** Stacking class for nested dialogs. Defaults to z-50. */
+  zClassName?: string;
 };
 
-export default function Modal({ open, onClose, title, description, children, footer, maxWidthClassName = "max-w-3xl", dismissible = true }: ModalProps) {
+export default function Modal({ open, onClose, title, description, titleClassName = "text-[var(--navy)]", children, footer, maxWidthClassName = "max-w-3xl", dismissible = true, zClassName = "z-50" }: ModalProps) {
   useEffect(() => {
     if (!open) return;
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -34,7 +37,7 @@ export default function Modal({ open, onClose, title, description, children, foo
   return (
     <AnimatePresence>
       {open && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6">
+        <div className={`fixed inset-0 ${zClassName} flex items-center justify-center p-3 sm:p-6`}>
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -53,9 +56,9 @@ export default function Modal({ open, onClose, title, description, children, foo
             transition={{ duration: 0.22, ease: "easeOut" }}
             className={`relative flex max-h-[92vh] w-full ${maxWidthClassName} flex-col overflow-hidden rounded-2xl bg-white shadow-[0_30px_80px_rgba(7,30,65,0.25)]`}
           >
-            <div className="flex items-start justify-between gap-4 border-b border-[var(--border)] p-5">
+            <div className={`flex justify-between gap-4 border-b border-[var(--border)] px-5 ${description ? "items-start py-4" : "items-center py-3"}`}>
               <div className="min-w-0">
-                <h2 className="font-display text-lg font-extrabold text-[var(--navy)]">{title}</h2>
+                <h2 className={`font-display text-lg font-extrabold leading-none ${titleClassName}`}>{title}</h2>
                 {description && <p className="mt-1 text-xs text-[var(--text-secondary)]">{description}</p>}
               </div>
               <button type="button" onClick={onClose} className="icon-button-small shrink-0" aria-label="Cerrar" title="Cerrar">

@@ -1315,6 +1315,10 @@ h6 {
   margin-bottom: 1rem;
 }
 
+.quote-step > legend:has(+ .quote-account-hint) {
+  margin-bottom: 0.4rem;
+}
+
 .quote-step-hint {
   background: rgba(8, 127, 213, 0.06);
   border-left: 3px solid var(--cyan);
@@ -2196,6 +2200,40 @@ h6 {
 .quote-field input[aria-invalid="true"],
 .quote-field textarea[aria-invalid="true"] {
   border-color: #c34268;
+}
+
+.quote-field.is-locked input {
+  background: rgba(8, 127, 213, 0.06);
+  color: var(--navy);
+  cursor: default;
+}
+
+.quote-field.is-locked input:focus {
+  border-color: var(--border);
+  box-shadow: none;
+}
+
+.quote-account-hint {
+  color: var(--text-secondary);
+  font-size: 0.78rem;
+  font-weight: 500;
+  line-height: 1.55;
+  margin: 0 0 0.9rem;
+}
+
+.quote-account-hint a {
+  color: var(--blue);
+  font-weight: 700;
+}
+
+.quote-account-hint a:hover {
+  color: var(--violet);
+}
+
+.quote-review-locked {
+  color: var(--text-secondary);
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
 .quote-error {
@@ -3233,6 +3271,22 @@ h6 {
   display: grid;
   gap: 0.75rem;
   margin-top: 1.5rem;
+}
+
+.portal-input {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 0.75rem;
+  color: var(--navy);
+  font-size: 0.875rem;
+  min-height: 2.75rem;
+  outline: none;
+  padding: 0.6rem 0.8rem;
+  width: 100%;
+}
+
+.portal-input:focus {
+  border-color: var(--blue);
 }
 
 .account-surface {

@@ -21,6 +21,17 @@ export type PaymentSummary = {
   updatedAt: string;
 };
 
+export function payableAmountFromQuoteTotal(total: Prisma.Decimal | number | string | null | undefined) {
+  if (total === null || total === undefined) {
+    return null;
+  }
+  const amountTotal = Math.round(Number(total));
+  if (!Number.isFinite(amountTotal) || amountTotal <= 0) {
+    return null;
+  }
+  return { amount: total, amountTotal };
+}
+
 export function serializePayment(payment: {
   id: string;
   status: PaymentStatus;

@@ -70,7 +70,7 @@ export default function InviteUserPage() {
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.16em] text-[var(--purple)]">Administración</p>
             <h1 className="font-display text-2xl font-extrabold tracking-tight text-[var(--navy)]">
-              Invitar usuario interno
+              Invitar colaborador
             </h1>
             <p className="mt-1 text-xs text-[var(--text-secondary)]">
               Envia una invitación para completar su registro en AXESSIA.

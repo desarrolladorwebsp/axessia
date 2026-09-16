@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { isValidResetTokenFormat, validatePassword } from "@/lib/password";
-import { lookupInternalPasswordResetToken, resetInternalPassword } from "@/lib/services/password-reset";
+import { lookupPasswordResetToken, resetPasswordWithToken } from "@/lib/services/password-reset";
 
 export async function GET(request: NextRequest) {
   try {
@@ -13,14 +13,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const lookup = await lookupInternalPasswordResetToken(token);
+    const lookup = await lookupPasswordResetToken(token);
 
     if (lookup.status !== "valid") {
       const statusCode = lookup.status === "invalid" ? 400 : 410;
       return NextResponse.json({ valid: false, error: lookup.message }, { status: statusCode });
     }
 
-    return NextResponse.json({ valid: true });
+    return NextResponse.json({ valid: true, audience: lookup.audience });
   } catch (error) {
     console.error("Error validating reset token:", error);
     return NextResponse.json(
@@ -62,7 +62,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Las contraseñas no coinciden." }, { status: 400 });
     }
 
-    const result = await resetInternalPassword(token, password);
+    const result = await resetPasswordWithToken(token, password);
 
     if (result.status !== "valid") {
       const statusCode = result.status === "invalid" ? 400 : 410;

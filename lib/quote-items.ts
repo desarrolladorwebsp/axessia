@@ -16,6 +16,7 @@ export type QuoteItemPayload = {
   manufacturer?: unknown;
   originCountry?: unknown;
   supplierCountry?: unknown;
+  supplierId?: unknown;
   quantity?: unknown;
   sanitaryRegistry?: unknown;
   condition?: unknown;
@@ -38,6 +39,7 @@ export type ParsedQuoteItem = {
   manufacturer: string | null;
   originCountry: string | null;
   supplierCountry: string | null;
+  supplierId: string | null;
   quantity: number;
   sanitaryRegistry: string | null;
   condition: "AVAILABLE" | "SPECIAL_IMPORT" | null;
@@ -66,6 +68,7 @@ export function parseQuoteItems(rawItems: QuoteItemPayload[], asDraft: boolean, 
     const manufacturer = typeof item.manufacturer === "string" && item.manufacturer.trim() ? item.manufacturer.trim() : null;
     const originCountry = typeof item.originCountry === "string" && item.originCountry.trim() ? item.originCountry.trim() : null;
     const supplierCountry = typeof item.supplierCountry === "string" && item.supplierCountry.trim() ? item.supplierCountry.trim() : null;
+    const supplierId = typeof item.supplierId === "string" && item.supplierId.trim() ? item.supplierId.trim() : null;
     const sanitaryRegistry = typeof item.sanitaryRegistry === "string" && item.sanitaryRegistry.trim() ? item.sanitaryRegistry.trim() : null;
     const batchNumber = typeof item.batchNumber === "string" && item.batchNumber.trim() ? item.batchNumber.trim() : null;
     const condition = quoteItemConditions.includes(item.condition as (typeof quoteItemConditions)[number]) ? (item.condition as (typeof quoteItemConditions)[number]) : null;
@@ -92,9 +95,10 @@ export function parseQuoteItems(rawItems: QuoteItemPayload[], asDraft: boolean, 
       description,
       presentation,
       unitsPerPackage,
-      manufacturer: manufacturer ?? brand,
+      manufacturer: manufacturer ?? (device ? brand : null),
       originCountry,
       supplierCountry,
+      supplierId,
       quantity,
       sanitaryRegistry,
       condition,
@@ -108,6 +112,35 @@ export function parseQuoteItems(rawItems: QuoteItemPayload[], asDraft: boolean, 
 
 export function computeQuoteTotal(items: ParsedQuoteItem[]): number | null {
   return items.some((item) => item.totalPrice !== null) ? items.reduce((sum, item) => sum + (item.totalPrice ?? 0), 0) : null;
+}
+
+export type QuoteItemSupplierSnapshot = {
+  id: string;
+  manufacturer: string | null;
+  originCountry: string | null;
+  country: string | null;
+};
+
+export function applyQuoteItemSuppliers(
+  items: ParsedQuoteItem[],
+  suppliers: QuoteItemSupplierSnapshot[],
+  asDraft: boolean,
+): ParsedQuoteItem[] {
+  const byId = new Map(suppliers.map((supplier) => [supplier.id, supplier]));
+  return items.map((item, index) => {
+    if (!item.supplierId) {
+      if (!asDraft) throw new Error(`Producto ${index + 1}: selecciona un proveedor`);
+      return { ...item, manufacturer: item.manufacturer, originCountry: item.originCountry, supplierCountry: item.supplierCountry };
+    }
+    const supplier = byId.get(item.supplierId);
+    if (!supplier) throw new Error(`Producto ${index + 1}: el proveedor seleccionado no es válido`);
+    return {
+      ...item,
+      manufacturer: supplier.manufacturer,
+      originCountry: supplier.originCountry,
+      supplierCountry: supplier.country,
+    };
+  });
 }
 
 export const DEFAULT_QUOTE_VALIDITY_DAYS = 7;

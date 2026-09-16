@@ -62,6 +62,7 @@ export async function GET(_request: Request, { params }: RouteContext) {
       unitPrice: item.unitPrice?.toString() ?? null,
       totalPrice: item.totalPrice?.toString() ?? null,
     })),
+    includeInternalSourcing: true,
   });
   const body = pdf.buffer.slice(pdf.byteOffset, pdf.byteOffset + pdf.byteLength) as ArrayBuffer;
   return new NextResponse(body, { headers: { "Content-Type": "application/pdf", "Content-Disposition": `attachment; filename="Cotizacion-AXESSIA-${quote.quoteNumber ?? id}.pdf"` } });

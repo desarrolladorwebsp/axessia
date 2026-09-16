@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readDevQuoteRequests, readDevQuotes, writeDevQuoteRequests, writeDevQuotes, shouldUseJsonStorage } from "@/lib/dev-request-store";
 import { parseQuoteItems, computeQuoteTotal, parseValidUntil, parseEstimatedShippingDays, type QuoteItemPayload } from "@/lib/quote-items";
+import { attachSuppliersToQuoteItems } from "@/lib/quote-item-suppliers";
 import { isProductType } from "@/lib/product-type";
 import { getInternalActor } from "@/lib/internal-access";
 
@@ -48,6 +49,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       let items: ReturnType<typeof parseQuoteItems>;
       try {
         items = parseQuoteItems(rawItems, asDraft, isProductType(requestType) ? requestType : "MEDICATION");
+        items = await attachSuppliersToQuoteItems(items, asDraft);
       } catch (validationError) {
         return invalid(validationError instanceof Error ? validationError.message : "Datos inválidos");
       }
@@ -85,6 +87,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     let items: ReturnType<typeof parseQuoteItems>;
     try {
       items = parseQuoteItems(rawItems, asDraft, existing.request.productType);
+      items = await attachSuppliersToQuoteItems(items, asDraft);
     } catch (validationError) {
       return invalid(validationError instanceof Error ? validationError.message : "Datos inválidos");
     }
@@ -95,7 +98,7 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
       const updated = await transaction.quote.update({
         where: { id },
         data: { status, total, validUntil, estimatedShippingDays, items: { create: items } },
-        include: { items: true, customer: { select: { id: true, name: true, email: true } }, request: { select: { id: true, requestNumber: true, requesterName: true, requesterEmail: true } } },
+        include: { items: { include: { supplier: { select: { id: true, name: true } } } }, customer: { select: { id: true, name: true, email: true } }, request: { select: { id: true, requestNumber: true, requesterName: true, requesterEmail: true } } },
       });
       if (!asDraft && existing.request.status !== "QUOTED") {
         await transaction.quoteRequest.update({ where: { id: existing.requestId }, data: { status: "QUOTED" } });

@@ -27,21 +27,35 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ ...request, clientDocuments: request.clientDocuments ?? [], generatedMandate: request.generatedMandate ?? null, internalNotes: request.internalNotes ?? [], events: request.events ?? [], quotes });
     }
 
-    const request = await prisma.quoteRequest.findUnique({
-      where: { id },
-      include: {
-        customer: true,
-        prescriptions: true,
-        clientDocuments: { orderBy: { createdAt: "desc" } },
-        generatedMandate: true,
-        medications: true,
-        medicalDevices: true,
-        internalNotes: { orderBy: { createdAt: "desc" } },
-        events: { orderBy: { createdAt: "desc" } },
-        quotes: { orderBy: { version: "desc" }, include: { items: true } },
-        assignedExecutive: { select: { id: true, firstName: true, lastName: true } },
-      },
-    });
+    const requestInclude = {
+      customer: true,
+      prescriptions: true,
+      clientDocuments: { orderBy: { createdAt: "desc" as const } },
+      generatedMandate: true,
+      medications: true,
+      medicalDevices: true,
+      internalNotes: { orderBy: { createdAt: "desc" as const } },
+      events: { orderBy: { createdAt: "desc" as const } },
+      assignedExecutive: { select: { id: true, firstName: true, lastName: true } },
+    };
+    let request;
+    try {
+      request = await prisma.quoteRequest.findUnique({
+        where: { id },
+        include: {
+          ...requestInclude,
+          quotes: { orderBy: { version: "desc" }, include: { items: { include: { supplier: { select: { id: true, name: true } } } } } },
+        },
+      });
+    } catch {
+      request = await prisma.quoteRequest.findUnique({
+        where: { id },
+        include: {
+          ...requestInclude,
+          quotes: { orderBy: { version: "desc" }, include: { items: true } },
+        },
+      });
+    }
 
     if (!request) {
       return NextResponse.json({ error: "Solicitud no encontrada" }, { status: 404 });

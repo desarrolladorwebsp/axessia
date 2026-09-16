@@ -130,7 +130,7 @@ export type DevQuoteRecord = {
   estimatedShippingDays: number | null;
   createdAt: string;
   sentAt: string | null;
-  items: Array<{
+    items: Array<{
     id: string;
     productType?: "MEDICATION" | "MEDICAL_DEVICE";
     productName: string;
@@ -145,6 +145,7 @@ export type DevQuoteRecord = {
     manufacturer: string | null;
     originCountry: string | null;
     supplierCountry: string | null;
+    supplierId?: string | null;
     quantity: number;
     sanitaryRegistry: string | null;
     condition: "AVAILABLE" | "SPECIAL_IMPORT" | null;

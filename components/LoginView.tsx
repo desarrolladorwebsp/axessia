@@ -5,6 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowLeft, ArrowRight, BriefcaseBusiness, Check, LockKeyhole, UserRound } from "lucide-react";
 import PasswordInput from "@/components/PasswordInput";
+import { safePortalNextPath } from "@/lib/portal/login-redirect";
 
 type AccountType = "client" | "executive";
 type ViewMode = "login" | "recovery";
@@ -44,7 +45,9 @@ export default function LoginView() {
         throw new Error(result.error ?? "No fue posible iniciar sesión.");
       }
 
-      window.location.href = accountType === "executive" ? "/app" : "/mi-cuenta";
+      window.location.href = accountType === "executive"
+        ? "/app"
+        : (safePortalNextPath(new URLSearchParams(window.location.search).get("next")) ?? "/mi-cuenta");
     } catch (submissionError) {
       setError(submissionError instanceof Error ? submissionError.message : "No fue posible iniciar sesión.");
     } finally {
@@ -68,7 +71,7 @@ export default function LoginView() {
       const response = await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: recoveryEmail }),
+        body: JSON.stringify({ email: recoveryEmail, accountType }),
       });
       const result = (await response.json()) as { error?: string; message?: string };
 
@@ -99,11 +102,8 @@ export default function LoginView() {
 
   const handleAccountTypeChange = (nextType: AccountType) => {
     setAccountType(nextType);
-    if (nextType === "client" && viewMode === "recovery") {
-      setViewMode("login");
-      setError("");
-      setSuccess("");
-    }
+    setError("");
+    setSuccess("");
   };
 
   return (
@@ -122,33 +122,33 @@ export default function LoginView() {
           </h1>
           <p>
             {viewMode === "recovery"
-              ? "Te enviaremos un enlace seguro a tu correo para restablecer el acceso a tu cuenta interna."
+              ? accountType === "client"
+                ? "Te enviaremos un enlace seguro a tu correo para restablecer el acceso a tu cuenta de cliente."
+                : "Te enviaremos un enlace seguro a tu correo para restablecer el acceso a tu cuenta interna."
               : "Consulta tus solicitudes y mantén todo bajo control."}
           </p>
         </div>
 
-        {viewMode === "login" && (
-          <div className="account-switcher" role="group" aria-label="Tipo de cuenta">
-            <button
-              type="button"
-              className={accountType === "client" ? "is-selected" : ""}
-              onClick={() => handleAccountTypeChange("client")}
-              aria-pressed={accountType === "client"}
-            >
-              <UserRound size={18} aria-hidden="true" />
-              <span>Cliente</span>
-            </button>
-            <button
-              type="button"
-              className={accountType === "executive" ? "is-selected" : ""}
-              onClick={() => handleAccountTypeChange("executive")}
-              aria-pressed={accountType === "executive"}
-            >
-              <BriefcaseBusiness size={18} aria-hidden="true" />
-              <span>Usuario interno</span>
-            </button>
-          </div>
-        )}
+        <div className="account-switcher" role="group" aria-label="Tipo de cuenta">
+          <button
+            type="button"
+            className={accountType === "client" ? "is-selected" : ""}
+            onClick={() => handleAccountTypeChange("client")}
+            aria-pressed={accountType === "client"}
+          >
+            <UserRound size={18} aria-hidden="true" />
+            <span>Cliente</span>
+          </button>
+          <button
+            type="button"
+            className={accountType === "executive" ? "is-selected" : ""}
+            onClick={() => handleAccountTypeChange("executive")}
+            aria-pressed={accountType === "executive"}
+          >
+            <BriefcaseBusiness size={18} aria-hidden="true" />
+            <span>Colaboradores</span>
+          </button>
+        </div>
 
         {viewMode === "login" ? (
           <motion.form
@@ -191,11 +191,9 @@ export default function LoginView() {
                 onToggleVisibility={() => setShowPassword((visible) => !visible)}
               />
             </motion.label>
-            {accountType === "executive" && (
-              <button type="button" className="login-recovery" onClick={openRecovery}>
-                ¿Olvidaste tu contraseña?
-              </button>
-            )}
+            <button type="button" className="login-recovery" onClick={openRecovery}>
+              ¿Olvidaste tu contraseña?
+            </button>
             {error && <p className="register-message register-message-error">{error}</p>}
             <button type="submit" className="login-submit" disabled={isSubmitting}>
               {isSubmitting ? "Ingresando..." : `Ingresar como ${accountType === "client" ? "cliente" : "usuario interno"}`}
@@ -227,7 +225,9 @@ export default function LoginView() {
               />
             </motion.label>
             <p className="login-notice">
-              Si el correo está registrado como usuario interno, recibirás un enlace para restablecer tu contraseña.
+              {accountType === "client"
+                ? "Si el correo está registrado como cliente, recibirás un enlace para restablecer tu contraseña."
+                : "Si el correo está registrado como colaborador, recibirás un enlace para restablecer tu contraseña."}
             </p>
             {error && <p className="register-message register-message-error">{error}</p>}
             {success && (

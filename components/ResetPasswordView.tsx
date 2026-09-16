@@ -168,7 +168,7 @@ export default function ResetPasswordView() {
         <div className="login-header">
           <p className="eyebrow">Recuperación de acceso</p>
           <h1 id="reset-password-title">Crea una nueva contraseña.</h1>
-          <p>Ingresa y confirma tu nueva contraseña para recuperar el acceso a tu cuenta interna.</p>
+          <p>Ingresa y confirma tu nueva contraseña para recuperar el acceso a tu cuenta.</p>
         </div>
 
         <motion.form

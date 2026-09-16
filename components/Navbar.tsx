@@ -6,6 +6,7 @@ import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { QuoteTrigger } from "@/components/QuoteModal";
+import AccountMenu from "@/components/portal/AccountMenu";
 
 const navigation = [
   { label: "Inicio", href: "/" },
@@ -18,9 +19,14 @@ function isCurrentRoute(pathname: string, href: string) {
   return href === "/" ? pathname === href : pathname.startsWith(href);
 }
 
-export default function Navbar() {
+export default function Navbar({ isCustomerLoggedIn = false }: { isCustomerLoggedIn?: boolean }) {
   const pathname = usePathname();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const accountHref = "/ingresar";
+
+  useEffect(() => {
+    setIsMenuOpen(false);
+  }, [pathname]);
 
   useEffect(() => {
     if (!isMenuOpen) return;
@@ -84,12 +90,16 @@ export default function Navbar() {
               </Link>
             );
           })}
-          <Link
-            href="/ingresar"
-            className="whitespace-nowrap rounded-lg px-1 py-2 text-[0.78rem] font-semibold text-[var(--navy)] transition-colors hover:text-[var(--blue)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue)] focus-visible:ring-offset-2"
-          >
-            Ingresar
-          </Link>
+          {isCustomerLoggedIn ? (
+            <AccountMenu />
+          ) : (
+            <Link
+              href={accountHref}
+              className="whitespace-nowrap rounded-lg px-1 py-2 text-[0.78rem] font-semibold text-[var(--navy)] transition-colors hover:text-[var(--blue)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue)] focus-visible:ring-offset-2"
+            >
+              Ingresar
+            </Link>
+          )}
         </div>
 
         <div className="flex items-center gap-2">
@@ -145,12 +155,17 @@ export default function Navbar() {
                   </Link>
                 );
               })}
-              <Link
-                href="/ingresar"
-                className="rounded-xl px-4 py-3 text-sm font-semibold text-[var(--navy)] transition-colors hover:bg-[var(--background)] hover:text-[var(--blue)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue)]"
-              >
-                Ingresar al sistema
-              </Link>
+              {isCustomerLoggedIn ? (
+                <AccountMenu variant="stack" onNavigate={() => setIsMenuOpen(false)} />
+              ) : (
+                <Link
+                  href={accountHref}
+                  onClick={() => setIsMenuOpen(false)}
+                  className="rounded-xl px-4 py-3 text-sm font-semibold text-[var(--navy)] transition-colors hover:bg-[var(--background)] hover:text-[var(--blue)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue)]"
+                >
+                  Ingresar al sistema
+                </Link>
+              )}
             </div>
           </motion.div>
         )}

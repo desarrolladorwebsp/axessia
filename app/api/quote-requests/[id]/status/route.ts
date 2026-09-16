@@ -7,6 +7,9 @@ import { sendMandateEmail } from "@/lib/services/email";
 import { getInternalActor } from "@/lib/internal-access";
 import { REQUEST_STATUS_LABELS } from "@/lib/request-status";
 import { mandateProductsFromRequest, productTypePluralLabel, requestProductCount } from "@/lib/product-type";
+import { notifyRequestCompleted } from "@/lib/customer-notifications/job";
+import { portalRequestUrl } from "@/lib/customer-notifications/urls";
+import { sendRequestCompletedEmail } from "@/lib/services/email";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -232,6 +235,18 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         const now = new Date().toISOString();
         records[index] = { ...records[index], status: transition.next as typeof records[number]["status"], updatedAt: now, events: [{ id: `dev-event-${Date.now()}`, status: transition.next, eventType: transition.eventType, note: note || null, createdAt: now }, ...(records[index].events ?? [])] };
         await writeDevQuoteRequests(records);
+        if (transition.next === "COMPLETED") {
+          try {
+            await sendRequestCompletedEmail({
+              customerEmail: records[index].requesterEmail,
+              customerName: records[index].requesterName,
+              requestNumber: records[index].requestNumber || records[index].id,
+              requestUrl: portalRequestUrl(records[index].id),
+            });
+          } catch (emailError) {
+            console.error("[CustomerNotifications] Failed to notify completed request:", emailError);
+          }
+        }
         return NextResponse.json({ status: transition.next, updatedAt: now });
       }
 
@@ -243,6 +258,13 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         await transaction.quoteRequestEvent.create({ data: { requestId: id, status: request.status, eventType: transition.eventType, note: note || null } });
         return request;
       });
+      if (transition.next === "COMPLETED") {
+        try {
+          await notifyRequestCompleted(id);
+        } catch (emailError) {
+          console.error("[CustomerNotifications] Failed to notify completed request:", emailError);
+        }
+      }
       return NextResponse.json({ status: updated.status, updatedAt: updated.updatedAt.toISOString() });
     }
 

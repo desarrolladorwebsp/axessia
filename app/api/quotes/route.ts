@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readDevQuotes, readDevQuoteRequests, shouldUseJsonStorage, writeDevQuotes, writeDevQuoteRequests, type DevQuoteRecord } from "@/lib/dev-request-store";
 import { parseQuoteItems, computeQuoteTotal, parseValidUntil, parseEstimatedShippingDays, type QuoteItemPayload } from "@/lib/quote-items";
+import { attachSuppliersToQuoteItems } from "@/lib/quote-item-suppliers";
 import { isProductType } from "@/lib/product-type";
 import { normalizeSearchValue } from "@/lib/search";
 import { getInternalActor } from "@/lib/internal-access";
@@ -43,6 +44,7 @@ export async function POST(request: NextRequest) {
       const source = requests[recordIndex];
       try {
         items = parseQuoteItems(rawItems, asDraft, isProductType(source.productType) ? source.productType : "MEDICATION");
+        items = await attachSuppliersToQuoteItems(items, asDraft);
       } catch (validationError) {
         return invalid(validationError instanceof Error ? validationError.message : "Datos inválidos");
       }
@@ -87,6 +89,7 @@ export async function POST(request: NextRequest) {
       if (!source) throw new Error("Solicitud no encontrada");
       try {
         items = parseQuoteItems(rawItems, asDraft, source.productType);
+        items = await attachSuppliersToQuoteItems(items, asDraft);
       } catch (validationError) {
         throw validationError instanceof Error ? validationError : new Error("Datos inválidos");
       }
@@ -116,8 +119,8 @@ export async function POST(request: NextRequest) {
         await transaction.quoteRequest.update({ where: { id: requestId }, data: { customerId } });
       }
       const latest = await transaction.quote.findFirst({ where: { requestId }, orderBy: { version: "desc" }, select: { version: true } });
-      const created = await transaction.quote.create({ data: { customerId, requestId, version: (latest?.version ?? 0) + 1, status, total, validUntil, estimatedShippingDays, items: { create: items } }, include: { items: true, customer: { select: { id: true, name: true, email: true } }, request: { select: { id: true, requestNumber: true, requesterName: true, requesterEmail: true } } } });
-      const numbered = await transaction.quote.update({ where: { id: created.id }, data: { quoteNumber: `C-${10000 + created.sequence}` }, include: { items: true, customer: { select: { id: true, name: true, email: true } }, request: { select: { id: true, requestNumber: true, requesterName: true, requesterEmail: true } } } });
+      const created = await transaction.quote.create({ data: { customerId, requestId, version: (latest?.version ?? 0) + 1, status, total, validUntil, estimatedShippingDays, items: { create: items } }, include: { items: { include: { supplier: { select: { id: true, name: true } } } }, customer: { select: { id: true, name: true, email: true } }, request: { select: { id: true, requestNumber: true, requesterName: true, requesterEmail: true } } } });
+      const numbered = await transaction.quote.update({ where: { id: created.id }, data: { quoteNumber: `C-${10000 + created.sequence}` }, include: { items: { include: { supplier: { select: { id: true, name: true } } } }, customer: { select: { id: true, name: true, email: true } }, request: { select: { id: true, requestNumber: true, requesterName: true, requesterEmail: true } } } });
       if (!asDraft) {
         await transaction.quoteRequest.update({ where: { id: requestId }, data: { status: "QUOTED" } });
         await transaction.quoteRequestEvent.create({ data: { requestId, status: "QUOTED", eventType: "QUOTE_CREATED" } });

@@ -1,4 +1,15 @@
 import { Resend } from "resend";
+import {
+  renderCustomerPasswordResetEmail,
+  renderMandateEmail,
+  renderQuoteAcceptedEmail,
+  renderQuoteExpiringSoonEmail,
+  renderQuotePendingReminderEmail,
+  renderQuoteReadyEmail,
+  renderQuoteRejectedEmail,
+  renderQuoteRequestReceivedEmail,
+  renderRequestCompletedEmail,
+} from "@/lib/services/customer-notification-emails";
 
 export const AXESSIA_EMAIL = "no-reply@axessia.cl";
 export const EMAIL_FORM = process.env.EMAIL_FORM || process.env.ADMIN_EMAIL_ADDRESS || "administracion@axessia.cl";
@@ -32,7 +43,18 @@ export function isEmailDeliveryConfigured() {
   return getResendClient() !== null;
 }
 
-export type EmailType = "quote_request_received" | "quote_ready" | "quote_accepted" | "quote_rejected";
+export type EmailType =
+  | "quote_request_received"
+  | "quote_ready"
+  | "quote_accepted"
+  | "quote_rejected"
+  | "quote_pending_reminder"
+  | "quote_expiring_soon"
+  | "request_completed";
+
+export type SendEmailResult = {
+  providerMessageId: string | null;
+};
 
 interface SendEmailParams {
   to: string;
@@ -63,15 +85,15 @@ export async function sendEmail(params: SendEmailParams): Promise<void> {
  * Send an email and await the result, throwing if it fails.
  * Use only where the caller needs to react to a failed send (e.g. retry flows).
  */
-export async function sendEmailAwaited(params: SendEmailParams): Promise<void> {
-  await sendEmailAsync(params);
+export async function sendEmailAwaited(params: SendEmailParams): Promise<SendEmailResult> {
+  return sendEmailAsync(params);
 }
 
 /**
  * Internal async email sender
  * Should not be called directly - use sendEmail() instead
  */
-async function sendEmailAsync(params: SendEmailParams): Promise<void> {
+async function sendEmailAsync(params: SendEmailParams): Promise<SendEmailResult> {
   const client = getResendClient();
   if (!client) {
     throw new Error("El envío de correo no está configurado.");
@@ -96,6 +118,7 @@ async function sendEmailAsync(params: SendEmailParams): Promise<void> {
   }
 
   console.log("[Email] Successfully sent email to:", params.to, data?.id);
+  return { providerMessageId: data?.id ?? null };
 }
 
 export async function sendMandateEmail(customerEmail: string, customerName: string, requestNumber: string, fileName: string, pdf: Uint8Array): Promise<void> {
@@ -104,10 +127,11 @@ export async function sendMandateEmail(customerEmail: string, customerName: stri
   if (!/^\S+@\S+\.\S+$/.test(recipient)) throw new Error("El correo del cliente no es válido para enviar el mandato.");
   const content = Buffer.from(pdf);
   if (!content.length) throw new Error("No fue posible generar el PDF del mandato.");
+  const trackingUrl = `${getAppUrl()}/seguimiento/${encodeURIComponent(requestNumber)}`;
   await sendEmailAwaited({
     to: recipient,
     subject: `Mandato para firma y notarización - ${requestNumber}`,
-    html: `<p>Hola ${customerName},</p><p>Adjuntamos el mandato AXESSIA asociado a tu solicitud ${requestNumber}. Revísalo, fírmalo y realiza la gestión notarial que corresponda. Luego, devuélvelo a AXESSIA por los canales indicados.</p><p>Saludos,<br />Equipo AXESSIA</p>`,
+    html: renderMandateEmail({ customerName, requestNumber, trackingUrl }),
     replyTo: EMAIL_FORM,
     attachments: [{ filename: fileName, content, contentType: "application/pdf" }],
   });
@@ -121,9 +145,12 @@ export async function sendQuoteRequestReceivedEmail(
   customerName: string,
   requestNumber: string,
 ): Promise<void> {
-  const html = generateQuoteRequestReceivedEmail({
+  const appUrl = getAppUrl();
+  const html = renderQuoteRequestReceivedEmail({
     customerName,
     requestNumber,
+    trackingUrl: `${appUrl}/seguimiento/${encodeURIComponent(requestNumber)}`,
+    faqUrl: `${appUrl}/preguntas-frecuentes`,
   });
 
   await sendEmail({
@@ -145,18 +172,76 @@ export async function sendQuoteReadyEmail(
   total: string | number | null,
   validUntil: string | null,
 ): Promise<void> {
-  const html = generateQuoteReadyEmail({
+  const appUrl = getAppUrl();
+  const html = renderQuoteReadyEmail({
     customerName,
     requestNumber,
     quoteNumber,
     total,
     validUntil,
+    trackingUrl: `${appUrl}/seguimiento/${encodeURIComponent(requestNumber)}`,
+    faqUrl: `${appUrl}/preguntas-frecuentes`,
   });
 
   await sendEmailAwaited({
     to: customerEmail,
     subject: `Tu cotización ${quoteNumber} está lista - AXESSIA`,
     html,
+  });
+}
+
+export async function sendQuotePendingReminderEmail(params: {
+  customerEmail: string;
+  customerName: string;
+  quoteNumber: string;
+  validUntilLabel: string;
+  quoteUrl: string;
+}): Promise<SendEmailResult> {
+  return sendEmailAwaited({
+    to: params.customerEmail,
+    subject: `Tu cotización ${params.quoteNumber} sigue pendiente - AXESSIA`,
+    html: renderQuotePendingReminderEmail({
+      customerName: params.customerName,
+      quoteNumber: params.quoteNumber,
+      validUntilLabel: params.validUntilLabel,
+      quoteUrl: params.quoteUrl,
+    }),
+  });
+}
+
+export async function sendQuoteExpiringSoonEmail(params: {
+  customerEmail: string;
+  customerName: string;
+  quoteNumber: string;
+  validUntilLabel: string;
+  quoteUrl: string;
+}): Promise<SendEmailResult> {
+  return sendEmailAwaited({
+    to: params.customerEmail,
+    subject: `Tu cotización ${params.quoteNumber} vence mañana - AXESSIA`,
+    html: renderQuoteExpiringSoonEmail({
+      customerName: params.customerName,
+      quoteNumber: params.quoteNumber,
+      validUntilLabel: params.validUntilLabel,
+      quoteUrl: params.quoteUrl,
+    }),
+  });
+}
+
+export async function sendRequestCompletedEmail(params: {
+  customerEmail: string;
+  customerName: string;
+  requestNumber: string;
+  requestUrl: string;
+}): Promise<SendEmailResult> {
+  return sendEmailAwaited({
+    to: params.customerEmail,
+    subject: `Tu solicitud ${params.requestNumber} fue finalizada - AXESSIA`,
+    html: renderRequestCompletedEmail({
+      customerName: params.customerName,
+      requestNumber: params.requestNumber,
+      requestUrl: params.requestUrl,
+    }),
   });
 }
 
@@ -204,6 +289,23 @@ export async function sendPasswordResetEmail(params: {
   });
 }
 
+export async function sendCustomerPasswordResetEmail(params: {
+  email: string;
+  customerName: string;
+  resetUrl: string;
+}): Promise<void> {
+  const html = renderCustomerPasswordResetEmail({
+    customerName: params.customerName,
+    resetUrl: params.resetUrl,
+  });
+
+  await sendEmailAwaited({
+    to: params.email,
+    subject: "Restablece tu contraseña - AXESSIA",
+    html,
+  });
+}
+
 export async function sendContactMessageEmail(params: {
   name: string;
   email: string;
@@ -220,323 +322,6 @@ export async function sendContactMessageEmail(params: {
     html,
     replyTo: params.email,
   });
-}
-
-/**
- * HTML template for customer confirmation email
- */
-function generateQuoteRequestReceivedEmail({
-  customerName,
-  requestNumber,
-}: {
-  customerName: string;
-  requestNumber: string;
-}): string {
-  const appUrl = getAppUrl();
-  const trackingUrl = `${appUrl}/seguimiento/${encodeURIComponent(requestNumber)}`;
-
-  return `
-    <!DOCTYPE html>
-    <html lang="es">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-          font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          line-height: 1.6;
-          color: #071E41;
-          background-color: #F7F9FC;
-        }
-        .container {
-          max-width: 600px;
-          margin: 0 auto;
-          background-color: #FFFFFF;
-          border-radius: 16px;
-          overflow: hidden;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        }
-        .header {
-          background: linear-gradient(90deg, #00A6D9 0%, #087FD5 45%, #7A28D8 100%);
-          padding: 40px 20px;
-          text-align: center;
-        }
-        .logo {
-          font-family: 'Montserrat', sans-serif;
-          font-size: 28px;
-          font-weight: 700;
-          color: #FFFFFF;
-          margin-bottom: 10px;
-        }
-        .content {
-          padding: 40px 30px;
-        }
-        .greeting {
-          font-size: 18px;
-          font-weight: 600;
-          margin-bottom: 20px;
-          color: #071E41;
-        }
-        .message {
-          font-size: 14px;
-          line-height: 1.8;
-          margin-bottom: 30px;
-          color: #4F5F73;
-        }
-        .info-box {
-          background-color: #F7F9FC;
-          border-left: 4px solid #087FD5;
-          padding: 20px;
-          margin: 30px 0;
-          border-radius: 8px;
-        }
-        .info-label {
-          font-size: 12px;
-          font-weight: 600;
-          text-transform: uppercase;
-          color: #4F5F73;
-          margin-bottom: 5px;
-        }
-        .info-value {
-          font-size: 16px;
-          font-weight: 600;
-          color: #071E41;
-        }
-        .cta-button {
-          display: inline-block;
-          background: linear-gradient(90deg, #00A6D9 0%, #087FD5 100%);
-          color: #FFFFFF;
-          padding: 12px 30px;
-          border-radius: 24px;
-          text-decoration: none;
-          font-weight: 600;
-          font-size: 14px;
-          margin: 20px 0;
-        }
-        .footer {
-          background-color: #F7F9FC;
-          padding: 30px;
-          text-align: center;
-          font-size: 12px;
-          color: #4F5F73;
-          border-top: 1px solid #DCE4ED;
-        }
-        .footer-text {
-          margin-bottom: 10px;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <div class="logo">AXESSIA</div>
-          <p style="color: rgba(255,255,255,0.9); font-size: 14px; margin: 0;">Soluciones de Farmacoterapia</p>
-        </div>
-
-        <div class="content">
-          <div class="greeting">¡Hola ${escapeHtml(customerName)}!</div>
-
-          <div class="message">
-            <p>Gracias por confiar en <strong>AXESSIA</strong>. Hemos recibido tu solicitud de cotización y nuestro equipo ha comenzado a revisarla.</p>
-          </div>
-
-          <div class="info-box">
-            <div class="info-label">Número de Solicitud</div>
-            <div class="info-value">${escapeHtml(requestNumber)}</div>
-            <p style="font-size: 12px; color: #4F5F73; margin-top: 10px;">Guarda este número para hacer seguimiento de tu solicitud.</p>
-          </div>
-
-          <div class="message">
-            <p><strong>¿Cuál es el siguiente paso?</strong></p>
-            <p>Nuestro equipo de especialistas revisará tu solicitud y los productos requeridos. Nos contactaremos contigo en breve con una cotización personalizada y las opciones disponibles.</p>
-          </div>
-
-          <div style="text-align: center;">
-            <a href="${trackingUrl}" class="cta-button">Ver Estado de mi Solicitud</a>
-          </div>
-
-          <div class="message" style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #DCE4ED;">
-            <p><strong>¿Preguntas?</strong></p>
-            <p>Si tienes dudas o necesitas contactarnos, responde a este correo o visita nuestra sección de <a href="${appUrl}/preguntas-frecuentes" style="color: #087FD5; text-decoration: none;">Preguntas Frecuentes</a>.</p>
-          </div>
-        </div>
-
-        <div class="footer">
-          <div class="footer-text">
-            © 2026 AXESSIA. Todos los derechos reservados.
-          </div>
-          <div class="footer-text" style="font-size: 11px; color: #8A96A8;">
-            <p>Este es un correo automatizado. Por favor no respondas con información sensible.</p>
-          </div>
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
-}
-
-/**
- * HTML template for the quote-ready customer notification
- */
-function generateQuoteReadyEmail({
-  customerName,
-  requestNumber,
-  quoteNumber,
-  total,
-  validUntil,
-}: {
-  customerName: string;
-  requestNumber: string;
-  quoteNumber: string;
-  total: string | number | null;
-  validUntil: string | null;
-}): string {
-  const appUrl = getAppUrl();
-  const trackingUrl = `${appUrl}/seguimiento/${encodeURIComponent(requestNumber)}`;
-  const totalLabel = total !== null ? `$${Number(total).toLocaleString("es-CL")}` : "Por confirmar";
-  const validUntilLabel = validUntil ? new Date(validUntil).toLocaleDateString("es-CL", { dateStyle: "long" }) : "Sin fecha límite";
-
-  return `
-    <!DOCTYPE html>
-    <html lang="es">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-          font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          line-height: 1.6;
-          color: #071E41;
-          background-color: #F7F9FC;
-        }
-        .container {
-          max-width: 600px;
-          margin: 0 auto;
-          background-color: #FFFFFF;
-          border-radius: 16px;
-          overflow: hidden;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        }
-        .header {
-          background: linear-gradient(90deg, #00A6D9 0%, #087FD5 45%, #7A28D8 100%);
-          padding: 40px 20px;
-          text-align: center;
-        }
-        .logo {
-          font-family: 'Montserrat', sans-serif;
-          font-size: 28px;
-          font-weight: 700;
-          color: #FFFFFF;
-          margin-bottom: 10px;
-        }
-        .content {
-          padding: 40px 30px;
-        }
-        .greeting {
-          font-size: 18px;
-          font-weight: 600;
-          margin-bottom: 20px;
-          color: #071E41;
-        }
-        .message {
-          font-size: 14px;
-          line-height: 1.8;
-          margin-bottom: 30px;
-          color: #4F5F73;
-        }
-        .info-box {
-          background-color: #F7F9FC;
-          border-left: 4px solid #7A28D8;
-          padding: 20px;
-          margin: 30px 0;
-          border-radius: 8px;
-        }
-        .info-label {
-          font-size: 12px;
-          font-weight: 600;
-          text-transform: uppercase;
-          color: #4F5F73;
-          margin-bottom: 5px;
-        }
-        .info-value {
-          font-size: 16px;
-          font-weight: 600;
-          color: #071E41;
-        }
-        .cta-button {
-          display: inline-block;
-          background: linear-gradient(90deg, #00A6D9 0%, #087FD5 100%);
-          color: #FFFFFF;
-          padding: 12px 30px;
-          border-radius: 24px;
-          text-decoration: none;
-          font-weight: 600;
-          font-size: 14px;
-          margin: 20px 0;
-        }
-        .footer {
-          background-color: #F7F9FC;
-          padding: 30px;
-          text-align: center;
-          font-size: 12px;
-          color: #4F5F73;
-          border-top: 1px solid #DCE4ED;
-        }
-        .footer-text {
-          margin-bottom: 10px;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <div class="logo">AXESSIA</div>
-          <p style="color: rgba(255,255,255,0.9); font-size: 14px; margin: 0;">Soluciones de Farmacoterapia</p>
-        </div>
-
-        <div class="content">
-          <div class="greeting">¡Hola ${escapeHtml(customerName)}!</div>
-
-          <div class="message">
-            <p>Tenemos buenas noticias: tu cotización ya está lista para revisión.</p>
-          </div>
-
-          <div class="info-box">
-            <div class="info-label">Número de Cotización</div>
-            <div class="info-value">${escapeHtml(quoteNumber)}</div>
-            <p style="font-size: 12px; color: #4F5F73; margin-top: 10px;">Solicitud asociada: ${escapeHtml(requestNumber)}</p>
-          </div>
-
-          <div class="info-box">
-            <div class="info-label">Total estimado</div>
-            <div class="info-value">${escapeHtml(totalLabel)}</div>
-            <p style="font-size: 12px; color: #4F5F73; margin-top: 10px;">Vigente hasta: ${escapeHtml(validUntilLabel)}</p>
-          </div>
-
-          <div style="text-align: center;">
-            <a href="${trackingUrl}" class="cta-button">Ver mi Cotización</a>
-          </div>
-
-          <div class="message" style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #DCE4ED;">
-            <p><strong>¿Preguntas?</strong></p>
-            <p>Si tienes dudas o necesitas contactarnos, responde a este correo o visita nuestra sección de <a href="${appUrl}/preguntas-frecuentes" style="color: #087FD5; text-decoration: none;">Preguntas Frecuentes</a>.</p>
-          </div>
-        </div>
-
-        <div class="footer">
-          <div class="footer-text">
-            © 2026 AXESSIA. Todos los derechos reservados.
-          </div>
-          <div class="footer-text" style="font-size: 11px; color: #8A96A8;">
-            <p>Este es un correo automatizado. Por favor no respondas con información sensible.</p>
-          </div>
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
 }
 
 /**
@@ -832,10 +617,11 @@ export async function sendQuoteAcceptedEmail(
   requestNumber: string,
   quoteNumber: string,
 ): Promise<void> {
-  const html = generateQuoteAcceptedEmail({
+  const html = renderQuoteAcceptedEmail({
     customerName,
     requestNumber,
     quoteNumber,
+    trackingUrl: `${getAppUrl()}/seguimiento/${encodeURIComponent(requestNumber)}`,
   });
 
   await sendEmail({
@@ -879,10 +665,11 @@ export async function sendQuoteRejectedEmail(
   quoteNumber: string,
   rejectionReason?: string,
 ): Promise<void> {
-  const html = generateQuoteRejectedEmail({
+  const html = renderQuoteRejectedEmail({
     customerName,
     requestNumber,
     quoteNumber,
+    trackingUrl: `${getAppUrl()}/seguimiento/${encodeURIComponent(requestNumber)}`,
     rejectionReason,
   });
 
@@ -917,195 +704,6 @@ export async function sendInternalQuoteRejectedNotification(
     html,
     replyTo: customerEmail,
   });
-}
-
-/**
- * HTML template for quote acceptance customer email
- */
-function generateQuoteAcceptedEmail({
-  customerName,
-  requestNumber,
-  quoteNumber,
-}: {
-  customerName: string;
-  requestNumber: string;
-  quoteNumber: string;
-}): string {
-  return `
-    <!DOCTYPE html>
-    <html lang="es">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-          font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          line-height: 1.6;
-          color: #071E41;
-          background-color: #F7F9FC;
-        }
-        .container {
-          max-width: 600px;
-          margin: 0 auto;
-          background-color: #FFFFFF;
-          border-radius: 16px;
-          overflow: hidden;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        }
-        .header {
-          background: linear-gradient(90deg, #00A6D9 0%, #087FD5 45%, #7A28D8 100%);
-          padding: 40px 20px;
-          text-align: center;
-        }
-        .logo {
-          font-family: 'Montserrat', sans-serif;
-          font-size: 28px;
-          font-weight: 700;
-          color: #FFFFFF;
-          margin-bottom: 10px;
-        }
-        .content {
-          padding: 40px 30px;
-        }
-        .success-icon {
-          font-size: 48px;
-          text-align: center;
-          margin-bottom: 20px;
-        }
-        .greeting {
-          font-size: 18px;
-          font-weight: 600;
-          margin-bottom: 20px;
-          color: #071E41;
-          text-align: center;
-        }
-        .message {
-          font-size: 14px;
-          line-height: 1.8;
-          margin-bottom: 30px;
-          color: #4F5F73;
-        }
-        .info-box {
-          background-color: #F7F9FC;
-          border-left: 4px solid #00A6D9;
-          padding: 20px;
-          margin: 30px 0;
-          border-radius: 8px;
-        }
-        .info-label {
-          font-size: 12px;
-          font-weight: 600;
-          text-transform: uppercase;
-          color: #4F5F73;
-          margin-bottom: 5px;
-        }
-        .info-value {
-          font-size: 16px;
-          font-weight: 600;
-          color: #071E41;
-        }
-        .next-steps {
-          background-color: #F0F9FF;
-          border-left: 4px solid #087FD5;
-          padding: 20px;
-          margin: 30px 0;
-          border-radius: 8px;
-        }
-        .next-steps .title {
-          font-size: 14px;
-          font-weight: 600;
-          color: #071E41;
-          margin-bottom: 10px;
-        }
-        .next-steps .step {
-          font-size: 13px;
-          color: #4F5F73;
-          margin-bottom: 8px;
-          padding-left: 20px;
-          position: relative;
-        }
-        .next-steps .step:before {
-          content: "✓";
-          position: absolute;
-          left: 0;
-          color: #087FD5;
-          font-weight: 600;
-        }
-        .cta-button {
-          display: inline-block;
-          background: linear-gradient(90deg, #00A6D9 0%, #087FD5 100%);
-          color: #FFFFFF;
-          padding: 12px 30px;
-          border-radius: 24px;
-          text-decoration: none;
-          font-weight: 600;
-          font-size: 14px;
-          margin: 20px 0;
-        }
-        .footer {
-          background-color: #F7F9FC;
-          padding: 30px;
-          text-align: center;
-          font-size: 12px;
-          color: #4F5F73;
-          border-top: 1px solid #DCE4ED;
-        }
-        .footer-text {
-          margin-bottom: 10px;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <div class="logo">AXESSIA</div>
-          <p style="color: rgba(255,255,255,0.9); font-size: 14px; margin: 0;">Soluciones de Farmacoterapia</p>
-        </div>
-
-        <div class="content">
-          <div class="success-icon">✓</div>
-          <div class="greeting">¡Cotización Aceptada!</div>
-
-          <div class="message">
-            <p>Excelente noticia, ${escapeHtml(customerName)}. Hemos recibido tu aceptación de la cotización y procederemos con los próximos pasos para procesarla.</p>
-          </div>
-
-          <div class="info-box">
-            <div class="info-label">Solicitud</div>
-            <div class="info-value">${escapeHtml(requestNumber)}</div>
-          </div>
-
-          <div class="info-box">
-            <div class="info-label">Cotización</div>
-            <div class="info-value">${escapeHtml(quoteNumber)}</div>
-          </div>
-
-          <div class="next-steps">
-            <div class="title">¿Qué sucede ahora?</div>
-            <div class="step">Procesaremos tu cotización aceptada</div>
-            <div class="step">Coordinaremos los detalles de entrega y pago</div>
-            <div class="step">Te contactaremos en breve para confirmar los siguientes pasos</div>
-          </div>
-
-          <div class="message">
-            <p><strong>¿Preguntas?</strong></p>
-            <p>Si tienes dudas sobre los próximos pasos, contáctanos directamente o responde a este correo.</p>
-          </div>
-        </div>
-
-        <div class="footer">
-          <div class="footer-text">
-            © 2026 AXESSIA. Todos los derechos reservados.
-          </div>
-          <div class="footer-text" style="font-size: 11px; color: #8A96A8;">
-            <p>Este es un correo automatizado. Por favor no respondas con información sensible.</p>
-          </div>
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
 }
 
 /**
@@ -1255,208 +853,6 @@ function generateInternalQuoteAcceptedEmail({
   `;
 }
 
-/**
- * HTML template for quote rejection customer email
- */
-function generateQuoteRejectedEmail({
-  customerName,
-  requestNumber,
-  quoteNumber,
-  rejectionReason,
-}: {
-  customerName: string;
-  requestNumber: string;
-  quoteNumber: string;
-  rejectionReason?: string;
-}): string {
-  return `
-    <!DOCTYPE html>
-    <html lang="es">
-    <head>
-      <meta charset="UTF-8">
-      <meta name="viewport" content="width=device-width, initial-scale=1.0">
-      <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body {
-          font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-          line-height: 1.6;
-          color: #071E41;
-          background-color: #F7F9FC;
-        }
-        .container {
-          max-width: 600px;
-          margin: 0 auto;
-          background-color: #FFFFFF;
-          border-radius: 16px;
-          overflow: hidden;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-        }
-        .header {
-          background: linear-gradient(90deg, #00A6D9 0%, #087FD5 45%, #7A28D8 100%);
-          padding: 40px 20px;
-          text-align: center;
-        }
-        .logo {
-          font-family: 'Montserrat', sans-serif;
-          font-size: 28px;
-          font-weight: 700;
-          color: #FFFFFF;
-          margin-bottom: 10px;
-        }
-        .content {
-          padding: 40px 30px;
-        }
-        .greeting {
-          font-size: 18px;
-          font-weight: 600;
-          margin-bottom: 20px;
-          color: #071E41;
-        }
-        .message {
-          font-size: 14px;
-          line-height: 1.8;
-          margin-bottom: 30px;
-          color: #4F5F73;
-        }
-        .info-box {
-          background-color: #FFF5F5;
-          border-left: 4px solid #D32F2F;
-          padding: 20px;
-          margin: 30px 0;
-          border-radius: 8px;
-        }
-        .info-label {
-          font-size: 12px;
-          font-weight: 600;
-          text-transform: uppercase;
-          color: #4F5F73;
-          margin-bottom: 5px;
-        }
-        .info-value {
-          font-size: 16px;
-          font-weight: 600;
-          color: #071E41;
-        }
-        .reason-box {
-          background-color: #F7F9FC;
-          border-left: 4px solid #087FD5;
-          padding: 20px;
-          margin: 30px 0;
-          border-radius: 8px;
-        }
-        .reason-label {
-          font-size: 12px;
-          font-weight: 600;
-          text-transform: uppercase;
-          color: #4F5F73;
-          margin-bottom: 8px;
-        }
-        .reason-text {
-          font-size: 14px;
-          color: #071E41;
-          line-height: 1.6;
-        }
-        .next-steps {
-          background-color: #F0F9FF;
-          border-left: 4px solid #087FD5;
-          padding: 20px;
-          margin: 30px 0;
-          border-radius: 8px;
-        }
-        .next-steps .title {
-          font-size: 14px;
-          font-weight: 600;
-          color: #071E41;
-          margin-bottom: 10px;
-        }
-        .next-steps .step {
-          font-size: 13px;
-          color: #4F5F73;
-          margin-bottom: 8px;
-          padding-left: 20px;
-          position: relative;
-        }
-        .next-steps .step:before {
-          content: "→";
-          position: absolute;
-          left: 0;
-          color: #087FD5;
-          font-weight: 600;
-        }
-        .footer {
-          background-color: #F7F9FC;
-          padding: 30px;
-          text-align: center;
-          font-size: 12px;
-          color: #4F5F73;
-          border-top: 1px solid #DCE4ED;
-        }
-        .footer-text {
-          margin-bottom: 10px;
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <div class="logo">AXESSIA</div>
-          <p style="color: rgba(255,255,255,0.9); font-size: 14px; margin: 0;">Soluciones de Farmacoterapia</p>
-        </div>
-
-        <div class="content">
-          <div class="greeting">Hola ${escapeHtml(customerName)},</div>
-
-          <div class="message">
-            <p>Recibimos que has decidido no aceptar esta cotización. Nos gustaría poder ayudarte con opciones alternativas.</p>
-          </div>
-
-          <div class="info-box">
-            <div class="info-label">Solicitud</div>
-            <div class="info-value">${escapeHtml(requestNumber)}</div>
-          </div>
-
-          <div class="info-box">
-            <div class="info-label">Cotización Rechazada</div>
-            <div class="info-value">${escapeHtml(quoteNumber)}</div>
-          </div>
-
-          ${
-            rejectionReason
-              ? `
-          <div class="reason-box">
-            <div class="reason-label">Tu comentario</div>
-            <div class="reason-text">${escapeHtml(rejectionReason)}</div>
-          </div>
-          `
-              : ""
-          }
-
-          <div class="next-steps">
-            <div class="title">¿Qué hacer ahora?</div>
-            <div class="step">Contactaremos para explorar otras opciones</div>
-            <div class="step">Podemos ajustar la propuesta según tus necesidades</div>
-            <div class="step">Estamos aquí para encontrar la mejor solución</div>
-          </div>
-
-          <div class="message">
-            <p><strong>¿Preguntas o comentarios?</strong></p>
-            <p>Queremos entender tu decisión. Responde a este correo con cualquier retroalimentación que te ayude a otros clientes.</p>
-          </div>
-        </div>
-
-        <div class="footer">
-          <div class="footer-text">
-            © 2026 AXESSIA. Todos los derechos reservados.
-          </div>
-          <div class="footer-text" style="font-size: 11px; color: #8A96A8;">
-            <p>Este es un correo automatizado. Por favor no respondas con información sensible.</p>
-          </div>
-        </div>
-      </div>
-    </body>
-    </html>
-  `;
-}
 
 /**
  * HTML template for internal quote rejection notification
@@ -1726,9 +1122,7 @@ function generatePasswordResetEmail({
           color: #FFFFFF;
           margin-bottom: 10px;
         }
-        .content {
-          padding: 40px 30px;
-        }
+        .content { padding: 40px 30px; }
         .greeting {
           font-size: 18px;
           font-weight: 600;
@@ -1743,7 +1137,8 @@ function generatePasswordResetEmail({
         }
         .cta-button {
           display: inline-block;
-          background: linear-gradient(90deg, #00A6D9 0%, #087FD5 100%);
+          background-color: #087FD5;
+          background: linear-gradient(90deg, #00A6D9 0%, #087FD5 45%, #7A28D8 100%);
           color: #FFFFFF;
           padding: 12px 30px;
           border-radius: 24px;
@@ -1760,39 +1155,34 @@ function generatePasswordResetEmail({
           color: #4F5F73;
           border-top: 1px solid #DCE4ED;
         }
-        .footer-text {
-          margin-bottom: 10px;
-        }
+        .footer-text { margin-bottom: 10px; }
       </style>
     </head>
     <body>
       <div class="container">
         <div class="header">
           <div class="logo">AXESSIA</div>
-          <p style="color: rgba(255,255,255,0.9); font-size: 14px; margin: 0;">Sistema interno de gestión</p>
+          <p style="color: rgba(255,255,255,0.9); font-size: 14px; margin: 0;">AXESSIA · Acceso interno</p>
         </div>
-
         <div class="content">
           <div class="greeting">Hola ${escapeHtml(fullName)},</div>
-
           <div class="message">
             <p>Recibimos una solicitud para restablecer la contraseña de tu cuenta interna en AXESSIA.</p>
-            <p>Si fuiste tú, haz clic en el siguiente botón para crear una nueva contraseña. El enlace es de un solo uso y vence en 1 hora.</p>
+            <p>Si fuiste tú, haz clic en el siguiente botón para crear una nueva contraseña. El enlace es personal, de un solo uso y vence en 1 hora.</p>
           </div>
-
           <div style="text-align: center;">
-            <a href="${resetUrl}" class="cta-button">Restablecer contraseña</a>
+            <a href="${escapeHtml(resetUrl)}" class="cta-button">Restablecer contraseña</a>
           </div>
-
+          <p style="font-size: 12px; line-height: 1.6; color: #4F5F73; word-break: break-all; margin-top: 8px;">
+            Si el botón no funciona, copia y pega este enlace en tu navegador:<br />
+            <a href="${escapeHtml(resetUrl)}" style="color: #087FD5; font-weight: 600;">${escapeHtml(resetUrl)}</a>
+          </p>
           <div class="message" style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #DCE4ED;">
             <p>Si no solicitaste este cambio, puedes ignorar este correo. Tu contraseña actual seguirá siendo válida.</p>
           </div>
         </div>
-
         <div class="footer">
-          <div class="footer-text">
-            © 2026 AXESSIA. Todos los derechos reservados.
-          </div>
+          <div class="footer-text">© 2026 AXESSIA. Todos los derechos reservados.</div>
           <div class="footer-text" style="font-size: 11px; color: #8A96A8;">
             <p>Este es un correo automatizado. Por favor no respondas con información sensible.</p>
           </div>

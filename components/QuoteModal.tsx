@@ -10,11 +10,13 @@ import {
   useState,
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
+import Link from "next/link";
 import { ArrowLeft, ArrowRight, FileCheck2, FileUp, LoaderCircle, Minus, Plus, X } from "lucide-react";
 
 import { isValidRut } from "@/lib/customer-validation";
 import { buildQuoteRequestFormData } from "@/lib/quote-request-form-data";
 import { readResponseJson } from "@/lib/http/read-response-json";
+import { PORTAL_PROFILE_PATH } from "@/lib/portal/paths";
 import { PRODUCT_TYPE_LABELS, PRODUCT_TYPE_PLURAL_LABELS, isMedicalDevice, type ProductType } from "@/lib/product-type";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024;
@@ -43,12 +45,15 @@ type DeviceProduct = {
   description: string;
 };
 
-type FormValues = {
+export type QuoteAccountContact = {
   name: string;
   phone: string;
   email: string;
   rut: string;
   city: string;
+};
+
+type FormValues = QuoteAccountContact & {
   file: File | null;
   patientName: string;
   patientRut: string;
@@ -89,9 +94,16 @@ const initialValues: FormValues = {
   patientRut: "",
 };
 
-export function QuoteModalProvider({ children }: { children: ReactNode }) {
+export function QuoteModalProvider({
+  children,
+  accountContact = null,
+}: {
+  children: ReactNode;
+  accountContact?: QuoteAccountContact | null;
+}) {
   const [isOpen, setIsOpen] = useState(false);
   const [values, setValues] = useState<FormValues>(initialValues);
+  const contactLocked = Boolean(accountContact);
   const [productType, setProductType] = useState<ProductType>("MEDICATION");
   const [products, setProducts] = useState<MedicationProduct[]>([emptyMedication(1)]);
   const [devices, setDevices] = useState<DeviceProduct[]>([emptyDevice(1)]);
@@ -116,6 +128,16 @@ export function QuoteModalProvider({ children }: { children: ReactNode }) {
   }, [isOpen]);
 
   const openQuoteModal = () => {
+    if (accountContact) {
+      setValues((current) => ({
+        ...current,
+        name: accountContact.name,
+        phone: accountContact.phone,
+        email: accountContact.email,
+        rut: accountContact.rut,
+        city: accountContact.city,
+      }));
+    }
     setIsOpen(true);
     setIsSubmitted(false);
     setCurrentStep(1);
@@ -128,6 +150,9 @@ export function QuoteModalProvider({ children }: { children: ReactNode }) {
   };
 
   const updateValue = (field: keyof FormValues, value: string) => {
+    if (contactLocked && (field === "name" || field === "phone" || field === "email" || field === "rut" || field === "city")) {
+      return;
+    }
     setValues((current) => ({ ...current, [field]: value }));
     setErrors((current) => ({ ...current, [field]: "" }));
   };
@@ -254,7 +279,7 @@ export function QuoteModalProvider({ children }: { children: ReactNode }) {
       const response = await fetch("/api/quote-requests", {
         method: "POST",
         body: buildQuoteRequestFormData({
-          customer: { name: values.name, phone: values.phone, email: values.email, rut: values.rut, city: values.city },
+          customer: accountContact ?? { name: values.name, phone: values.phone, email: values.email, rut: values.rut, city: values.city },
           patient: differentPatient ? { name: values.patientName, rut: values.patientRut } : undefined,
           productType,
           medications: isMedicalDevice(productType) ? [] : products.map((product) => ({
@@ -355,12 +380,18 @@ export function QuoteModalProvider({ children }: { children: ReactNode }) {
                   <AnimatePresence mode="wait" initial={false}>
                     {currentStep === 1 && <motion.div key="contact-step" className="quote-step" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -18 }} transition={{ duration: 0.2 }}>
                     <legend>Datos de contacto</legend>
+                    {contactLocked && (
+                      <p className="quote-account-hint">
+                        Usamos los datos de tu cuenta y no se pueden editar en esta solicitud. Si necesitas actualizarlos, ve a{" "}
+                        <Link href={PORTAL_PROFILE_PATH}>tu perfil</Link>.
+                      </p>
+                    )}
                     <div className="quote-fields-grid">
-                      <Field label="Nombre" placeholder="Ej: Ana Pérez" id="quote-name" value={values.name} error={errors.name} onChange={(value) => updateValue("name", value)} />
-                      <Field label="Número de teléfono" placeholder="Ej: +56 9 1234 5678" id="quote-phone" type="tel" value={values.phone} error={errors.phone} onChange={(value) => updateValue("phone", value)} />
-                      <Field label="Correo electrónico" placeholder="Ej: ana@correo.cl" id="quote-email" type="email" value={values.email} error={errors.email} onChange={(value) => updateValue("email", value)} />
-                      <Field label="RUT" placeholder="Ej: 12.345.678-9" id="quote-rut" value={values.rut} error={errors.rut} onChange={(value) => updateValue("rut", value)} />
-                      <Field label="Ciudad" placeholder="Ej: Santiago" id="quote-city" value={values.city} error={errors.city} onChange={(value) => updateValue("city", value)} />
+                      <Field label="Nombre" placeholder="Ej: Ana Pérez" id="quote-name" value={values.name} error={errors.name} readOnly={contactLocked} autoComplete="name" onChange={(value) => updateValue("name", value)} />
+                      <Field label="Número de teléfono" placeholder="Ej: +56 9 1234 5678" id="quote-phone" type="tel" value={values.phone} error={errors.phone} readOnly={contactLocked} autoComplete="tel" onChange={(value) => updateValue("phone", value)} />
+                      <Field label="Correo electrónico" placeholder="Ej: ana@correo.cl" id="quote-email" type="email" value={values.email} error={errors.email} readOnly={contactLocked} autoComplete="email" onChange={(value) => updateValue("email", value)} />
+                      <Field label="RUT" placeholder="Ej: 12.345.678-9" id="quote-rut" value={values.rut} error={errors.rut} readOnly={contactLocked} autoComplete="off" onChange={(value) => updateValue("rut", value)} />
+                      <Field label="Ciudad" placeholder="Ej: Santiago" id="quote-city" value={values.city} error={errors.city} readOnly={contactLocked} autoComplete="address-level2" onChange={(value) => updateValue("city", value)} />
                     </div>
                     <label className="quote-patient-toggle" htmlFor="different-patient">
                       <input id="different-patient" type="checkbox" checked={differentPatient} onChange={(event) => setDifferentPatient(event.target.checked)} />
@@ -471,9 +502,9 @@ export function QuoteModalProvider({ children }: { children: ReactNode }) {
                   {currentStep === 3 && <motion.div key="confirmation-step" className="quote-step" initial={{ opacity: 0, x: 18 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -18 }} transition={{ duration: 0.2 }}>
                     <div className="quote-review">
                       <div className="quote-review-heading"><div><p className="eyebrow">Paso final</p><h3>Revisa tu solicitud</h3></div><FileCheck2 size={28} aria-hidden="true" /></div>
-                      <ReviewRow label="Cliente" value={values.name} onEdit={() => setCurrentStep(1)} />
-                      <ReviewRow label="Contacto" value={`${values.email} · ${values.phone}`} onEdit={() => setCurrentStep(1)} />
-                      <ReviewRow label="Ubicación" value={`${values.city} · ${values.rut}`} onEdit={() => setCurrentStep(1)} />
+                      <ReviewRow label="Cliente" value={values.name} editable={!contactLocked} onEdit={() => setCurrentStep(1)} />
+                      <ReviewRow label="Contacto" value={`${values.email} · ${values.phone}`} editable={!contactLocked} onEdit={() => setCurrentStep(1)} />
+                      <ReviewRow label="Ubicación" value={`${values.city} · ${values.rut}`} editable={!contactLocked} onEdit={() => setCurrentStep(1)} />
                       {differentPatient && <ReviewRow label="Paciente" value={`${values.patientName} · ${values.patientRut}`} onEdit={() => setCurrentStep(1)} />}
                       <ReviewRow label="Tipo" value={PRODUCT_TYPE_LABELS[productType]} onEdit={() => setCurrentStep(2)} />
                       <ReviewRow label={isMedicalDevice(productType) ? "Documento" : "Receta"} value={values.file?.name ?? (isMedicalDevice(productType) ? "Sin archivo" : "Sin archivo")} onEdit={() => setCurrentStep(2)} />
@@ -536,20 +567,50 @@ function StepButton({ children, onClick, variant = "primary" }: { children: Reac
   return <button type="button" className={`quote-step-button quote-step-button-${variant}`} onClick={onClick}>{children}</button>;
 }
 
-function ReviewRow({ label, value, onEdit }: { label: string; value: string; onEdit: () => void }) {
+function ReviewRow({ label, value, onEdit, editable = true }: { label: string; value: string; onEdit: () => void; editable?: boolean }) {
   return (
     <div className="quote-review-row">
       <div><span>{label}</span><strong>{value}</strong></div>
-      <button type="button" onClick={onEdit}>Editar</button>
+      {editable ? <button type="button" onClick={onEdit}>Editar</button> : <span className="quote-review-locked">Cuenta</span>}
     </div>
   );
 }
 
-function Field({ label, id, value, error, type = "text", placeholder, onChange }: { label: string; id: string; value: string; error?: string; type?: string; placeholder?: string; onChange: (value: string) => void }) {
+function Field({
+  label,
+  id,
+  value,
+  error,
+  type = "text",
+  placeholder,
+  readOnly = false,
+  autoComplete,
+  onChange,
+}: {
+  label: string;
+  id: string;
+  value: string;
+  error?: string;
+  type?: string;
+  placeholder?: string;
+  readOnly?: boolean;
+  autoComplete?: string;
+  onChange: (value: string) => void;
+}) {
   return (
-    <label className="quote-field" htmlFor={id}>
+    <label className={`quote-field${readOnly ? " is-locked" : ""}`} htmlFor={id}>
       <span>{label}</span>
-      <input id={id} type={type} value={value} placeholder={placeholder} onChange={(event) => onChange(event.target.value)} aria-invalid={Boolean(error)} />
+      <input
+        id={id}
+        type={type}
+        value={value}
+        placeholder={placeholder}
+        readOnly={readOnly}
+        autoComplete={readOnly ? "off" : autoComplete}
+        onChange={readOnly ? undefined : (event) => onChange(event.target.value)}
+        aria-invalid={Boolean(error)}
+        aria-readonly={readOnly || undefined}
+      />
       {error && <small className="quote-error">{error}</small>}
     </label>
   );
