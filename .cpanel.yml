@@ -1,0 +1,10 @@
+---
+deployment:
+  tasks:
+    - export DEPLOYPATH=/home/axessia/axessia/
+    - export PATH=/opt/cpanel/ea-nodejs22/bin:/opt/cpanel/ea-nodejs20/bin:/opt/cpanel/ea-nodejs18/bin:/opt/cpanel/ea-nodejs16/bin:$PATH
+    - /usr/bin/rsync -a --exclude='.git/' --exclude='.cpanel.yml' --exclude='.env' --exclude='.env.*' --exclude='node_modules/' --exclude='.next/' --exclude='storage/' --exclude='tmp/' ./ $DEPLOYPATH
+    - cd $DEPLOYPATH && npm ci --no-audit --no-fund
+    - cd $DEPLOYPATH && npx prisma generate
+    - cd $DEPLOYPATH && npm run build
+    - cd $DEPLOYPATH && /bin/mkdir -p tmp && /usr/bin/touch tmp/restart.txt
