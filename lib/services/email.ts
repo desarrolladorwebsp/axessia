@@ -9,6 +9,7 @@ import {
   renderQuoteRejectedEmail,
   renderQuoteRequestReceivedEmail,
   renderRequestCompletedEmail,
+  renderShippingStartedEmail,
 } from "@/lib/services/customer-notification-emails";
 
 export const AXESSIA_EMAIL = "no-reply@axessia.cl";
@@ -242,6 +243,21 @@ export async function sendRequestCompletedEmail(params: {
       requestNumber: params.requestNumber,
       requestUrl: params.requestUrl,
     }),
+  });
+}
+
+export async function sendShippingStartedEmail(params: {
+  customerEmail: string;
+  customerName: string;
+  requestNumber: string;
+  estimatedDeliveryDate: string;
+  shippingMethod: string;
+  requestUrl: string;
+}): Promise<SendEmailResult> {
+  return sendEmailAwaited({
+    to: params.customerEmail,
+    subject: `Tu solicitud ${params.requestNumber} está en despacho - AXESSIA`,
+    html: renderShippingStartedEmail(params),
   });
 }
 

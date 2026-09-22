@@ -199,6 +199,7 @@ export async function GET(request: NextRequest) {
             },
           },
           items: { select: { productName: true, quantity: true } },
+          payments: { orderBy: { createdAt: "desc" }, take: 1, select: { status: true, paidAt: true } },
         },
       }),
       prisma.quote.count({ where }),

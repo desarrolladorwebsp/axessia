@@ -380,6 +380,31 @@ export function renderRequestCompletedEmail(input: {
   });
 }
 
+export function renderShippingStartedEmail(input: {
+  customerName: string;
+  requestNumber: string;
+  estimatedDeliveryDate: string;
+  shippingMethod: string;
+  requestUrl: string;
+}) {
+  return renderCustomerEmail({
+    eyebrow: "Actualización de tu solicitud",
+    greeting: input.customerName,
+    introHtml: `
+      <p>Tu solicitud AXESSIA ya está en despacho.</p>
+      <p>Estos son los datos referenciales de entrega:</p>
+    `,
+    infoRows: [
+      { label: "Número de solicitud", value: input.requestNumber },
+      { label: "Fecha estimada de entrega", value: input.estimatedDeliveryDate },
+      { label: "Forma de envío", value: input.shippingMethod },
+    ],
+    ctaLabel: "Ver seguimiento",
+    ctaUrl: input.requestUrl,
+    closingHtml: "<p>La fecha estimada y la coordinación pueden modificarse por retrasos, disponibilidad u otros inconvenientes externos.</p>",
+  });
+}
+
 export function renderCustomerPasswordResetEmail(input: {
   customerName: string;
   resetUrl: string;

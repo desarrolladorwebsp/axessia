@@ -44,6 +44,7 @@ export type QuoteDetail = {
   estimatedShippingDays?: number | null;
   createdAt: string;
   items: QuoteItemDetail[];
+  payments?: Array<{ status: string; paidAt?: string | null }>;
 };
 
 export const quoteStatusLabels: Record<string, string> = { DRAFT: "Borrador", READY: "Lista para enviar", SENT: "Enviada", ACCEPTED: "Aceptada", REJECTED: "Rechazada", EXPIRED: "Vencida", VOIDED: "Anulada" };
@@ -78,6 +79,7 @@ export default function ViewQuoteModal({
   const canEdit = editableStatuses.includes(quote.status);
   const canSend = quote.status === "READY";
   const shippingEstimate = formatEstimatedShippingDays(quote.estimatedShippingDays);
+  const isPaid = quote.payments?.some((payment) => payment.status === "PAID") ?? false;
 
   const sendQuote = async () => {
     if (isSending) return;
@@ -134,6 +136,7 @@ export default function ViewQuoteModal({
       )}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <StatusBadge label={quoteStatusLabels[quote.status] || quote.status} tone={quoteStatusTones[quote.status]} />
+        {quote.status === "ACCEPTED" && <span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold ${isPaid ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"}`}>{isPaid ? "PAGADA" : "PAGO PENDIENTE"}</span>}
         <span className="text-xs text-[var(--text-secondary)]">{quote.items.length} producto{quote.items.length === 1 ? "" : "s"}</span>
       </div>
 

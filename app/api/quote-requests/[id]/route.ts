@@ -44,7 +44,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
         where: { id },
         include: {
           ...requestInclude,
-          quotes: { orderBy: { version: "desc" }, include: { items: { include: { supplier: { select: { id: true, name: true } } } } } },
+          quotes: { orderBy: { version: "desc" }, include: { items: { include: { supplier: { select: { id: true, name: true } } } }, payments: { orderBy: { createdAt: "desc" }, take: 1, select: { status: true, paidAt: true } } } },
         },
       });
     } catch {
@@ -52,7 +52,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
         where: { id },
         include: {
           ...requestInclude,
-          quotes: { orderBy: { version: "desc" }, include: { items: true } },
+          quotes: { orderBy: { version: "desc" }, include: { items: true, payments: { orderBy: { createdAt: "desc" }, take: 1, select: { status: true, paidAt: true } } } },
         },
       });
     }

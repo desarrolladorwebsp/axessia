@@ -15,7 +15,7 @@ import { FilterBar, SearchField, FilterSelect } from "../components/FilterBar";
 import Pagination from "../components/Pagination";
 
 type QuoteStatus = "DRAFT" | "READY" | "SENT" | "ACCEPTED" | "REJECTED" | "EXPIRED" | "VOIDED";
-type Quote = { id: string; quoteNumber: string | null; version: number; status: QuoteStatus; total: string | null; validUntil: string | null; createdAt: string; sentAt: string | null; request: { id: string; requestNumber: string | null; requesterName: string; requesterEmail: string; customer: { name: string; email: string } | null }; items: Array<{ productName: string; quantity: number }> };
+type Quote = { id: string; quoteNumber: string | null; version: number; status: QuoteStatus; total: string | null; validUntil: string | null; createdAt: string; sentAt: string | null; payments?: Array<{ status: string; paidAt?: string | null }>; request: { id: string; requestNumber: string | null; requesterName: string; requesterEmail: string; customer: { name: string; email: string } | null }; items: Array<{ productName: string; quantity: number }> };
 type QuotesResponse = {
   quotes: Quote[];
   summary?: {
@@ -127,7 +127,7 @@ export default function QuotesPage() {
                 <thead>
                   <tr className="border-b border-[var(--border)] bg-[var(--background)]">
                     <th className="w-12 px-4 py-3"><input type="checkbox" aria-label="Seleccionar todas" className="accent-[var(--purple)]" /></th>
-                    {["Cotización", "Cliente", "Solicitud", "Fecha emisión", "Estado actual", "Total", "Acciones"].map((header) => (
+                    {["Cotización", "Cliente", "Solicitud", "Fecha emisión", "Estado actual", "Pago", "Total", "Acciones"].map((header) => (
                       <th key={header} className="px-3 py-3 text-[10px] font-bold uppercase tracking-wide text-[var(--navy)]">
                         {header}<ChevronDown className="ml-1 inline h-3 w-3 text-[var(--text-secondary)]" />
                       </th>
@@ -180,6 +180,7 @@ function QuoteRow({ quote, index, onOpen }: { quote: Quote; index: number; onOpe
         {new Date(quote.createdAt).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}
       </td>
       <td className="px-3 py-4"><StatusBadge label={statusLabels[quote.status]} tone={statusTones[quote.status]} /></td>
+      <td className="px-3 py-4">{quote.status === "ACCEPTED" ? <span className={`rounded-full px-2 py-1 text-[10px] font-extrabold ${quote.payments?.some((payment) => payment.status === "PAID") ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"}`}>{quote.payments?.some((payment) => payment.status === "PAID") ? "PAGADA" : "PENDIENTE"}</span> : <span className="text-[10px] text-[var(--text-secondary)]">—</span>}</td>
       <td className="px-3 py-4 text-xs font-bold text-[var(--navy)]">{quote.total ? `$${Number(quote.total).toLocaleString("es-CL")}` : "Pendiente"}</td>
       <td className="px-3 py-4">
         <a href={`/api/quotes/${quote.id}/pdf`} target="_blank" rel="noreferrer" onClick={(event) => event.stopPropagation()} className="icon-button-small" aria-label={`Descargar ${quote.quoteNumber || "cotización"} en PDF`} title="Descargar PDF">
@@ -211,6 +212,7 @@ function MobileQuoteCard({ quote, index, onOpen }: { quote: Quote; index: number
         <span>{quote.request.requestNumber || "Sin solicitud"}</span>
         <span>{quote.total ? `$${Number(quote.total).toLocaleString("es-CL")}` : "Pendiente"}</span>
       </div>
+      {quote.status === "ACCEPTED" && <p className={`mt-2 text-[10px] font-extrabold ${quote.payments?.some((payment) => payment.status === "PAID") ? "text-emerald-700" : "text-amber-800"}`}>{quote.payments?.some((payment) => payment.status === "PAID") ? "PAGADA" : "PAGO PENDIENTE"}</p>}
     </motion.article>
   );
 }

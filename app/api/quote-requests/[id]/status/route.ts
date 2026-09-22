@@ -9,13 +9,14 @@ import { REQUEST_STATUS_LABELS } from "@/lib/request-status";
 import { mandateProductsFromRequest, productTypePluralLabel, requestProductCount } from "@/lib/product-type";
 import { notifyRequestCompleted } from "@/lib/customer-notifications/job";
 import { portalRequestUrl } from "@/lib/customer-notifications/urls";
-import { sendRequestCompletedEmail } from "@/lib/services/email";
+import { sendRequestCompletedEmail, sendShippingStartedEmail } from "@/lib/services/email";
+import { buildShippingNote, validateShippingStart } from "@/lib/shipping";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-type StatusPayload = { action?: unknown; executiveId?: unknown; reason?: unknown; note?: unknown; fileName?: unknown; mimeType?: unknown; fileSize?: unknown };
+type StatusPayload = { action?: unknown; executiveId?: unknown; reason?: unknown; note?: unknown; fileName?: unknown; mimeType?: unknown; fileSize?: unknown; estimatedDeliveryDate?: unknown; shippingMethod?: unknown };
 
 function invalid(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -225,13 +226,19 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       const transition = action === "START_SHIPPING"
         ? { expected: "ACCEPTED", next: "SHIPPING", eventType: "SHIPPING_STARTED" }
         : { expected: "SHIPPING", next: "COMPLETED", eventType: "REQUEST_COMPLETED" };
-      const note = typeof payload.note === "string" ? payload.note.trim().slice(0, 2000) : "";
+      let note = typeof payload.note === "string" ? payload.note.trim().slice(0, 2000) : "";
 
       if (shouldUseJsonStorage()) {
         const records = await readDevQuoteRequests();
         const index = records.findIndex((record) => record.id === id);
         if (index === -1) return invalid("Solicitud no encontrada", 404);
         if (records[index].status !== transition.expected) return invalid("La solicitud no está disponible para esta acción", 409);
+        if (action === "START_SHIPPING") {
+          const hasPaid = (records[index].events ?? []).some((event) => event.eventType === "PAYMENT_CONFIRMED");
+          const shipping = validateShippingStart({ requestStatus: records[index].status, hasPaid, estimatedDeliveryDate: payload.estimatedDeliveryDate, shippingMethod: payload.shippingMethod });
+          if (!shipping.ok) return invalid(shipping.error, 409);
+          note = buildShippingNote(shipping);
+        }
         const now = new Date().toISOString();
         records[index] = { ...records[index], status: transition.next as typeof records[number]["status"], updatedAt: now, events: [{ id: `dev-event-${Date.now()}`, status: transition.next, eventType: transition.eventType, note: note || null, createdAt: now }, ...(records[index].events ?? [])] };
         await writeDevQuoteRequests(records);
@@ -247,12 +254,22 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
             console.error("[CustomerNotifications] Failed to notify completed request:", emailError);
           }
         }
+        if (action === "START_SHIPPING") {
+          try {
+            await sendShippingStartedEmail({ customerEmail: records[index].requesterEmail, customerName: records[index].requesterName, requestNumber: records[index].requestNumber || records[index].id, estimatedDeliveryDate: records[index].events?.[0]?.note?.match(/Fecha estimada de entrega: ([^\n]+)\./)?.[1] || "Por confirmar", shippingMethod: records[index].events?.[0]?.note?.match(/Forma de envío: ([^\n]+)\./)?.[1] || "Por confirmar", requestUrl: portalRequestUrl(records[index].id) });
+          } catch (emailError) { console.error("[CustomerNotifications] Failed to notify shipping request:", emailError); }
+        }
         return NextResponse.json({ status: transition.next, updatedAt: now });
       }
 
-      const existing = await prisma.quoteRequest.findUnique({ where: { id }, select: { status: true } });
+      const existing = await prisma.quoteRequest.findUnique({ where: { id }, select: { status: true, requesterEmail: true, requesterName: true, requestNumber: true, payments: { where: { status: "PAID" }, select: { id: true }, take: 1 } } });
       if (!existing) return invalid("Solicitud no encontrada", 404);
       if (existing.status !== transition.expected) return invalid("La solicitud no está disponible para esta acción", 409);
+      if (action === "START_SHIPPING") {
+        const shipping = validateShippingStart({ requestStatus: existing.status, hasPaid: existing.payments.length > 0, estimatedDeliveryDate: payload.estimatedDeliveryDate, shippingMethod: payload.shippingMethod });
+        if (!shipping.ok) return invalid(shipping.error, 409);
+        note = buildShippingNote(shipping);
+      }
       const updated = await prisma.$transaction(async (transaction) => {
         const request = await transaction.quoteRequest.update({ where: { id }, data: { status: transition.next as "SHIPPING" | "COMPLETED" }, select: { status: true, updatedAt: true } });
         await transaction.quoteRequestEvent.create({ data: { requestId: id, status: request.status, eventType: transition.eventType, note: note || null } });
@@ -263,6 +280,12 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
           await notifyRequestCompleted(id);
         } catch (emailError) {
           console.error("[CustomerNotifications] Failed to notify completed request:", emailError);
+        }
+      }
+      if (action === "START_SHIPPING") {
+        const shipping = validateShippingStart({ requestStatus: existing.status, hasPaid: existing.payments.length > 0, estimatedDeliveryDate: payload.estimatedDeliveryDate, shippingMethod: payload.shippingMethod });
+        if (shipping.ok) {
+          try { await sendShippingStartedEmail({ customerEmail: existing.requesterEmail, customerName: existing.requesterName, requestNumber: existing.requestNumber || id, estimatedDeliveryDate: shipping.estimatedDeliveryDate, shippingMethod: shipping.shippingMethod, requestUrl: portalRequestUrl(id) }); } catch (emailError) { console.error("[CustomerNotifications] Failed to notify shipping request:", emailError); }
         }
       }
       return NextResponse.json({ status: updated.status, updatedAt: updated.updatedAt.toISOString() });

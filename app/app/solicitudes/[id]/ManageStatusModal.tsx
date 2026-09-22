@@ -27,12 +27,14 @@ export default function ManageStatusModal({
   onClose,
   requestId,
   currentStatus,
+  hasPaid,
   onUpdated,
 }: {
   open: boolean;
   onClose: () => void;
   requestId: string;
   currentStatus: string;
+  hasPaid: boolean;
   onUpdated: (result: ManageStatusResult) => void;
 }) {
   const [step, setStep] = useState<Step>("choose");
@@ -42,6 +44,8 @@ export default function ManageStatusModal({
   const [reason, setReason] = useState("");
   const [stage, setStage] = useState<Stage>("idle");
   const [error, setError] = useState("");
+  const [estimatedDeliveryDate, setEstimatedDeliveryDate] = useState("");
+  const [shippingMethod, setShippingMethod] = useState("");
 
   useEffect(() => {
     if (!open) return;
@@ -50,6 +54,8 @@ export default function ManageStatusModal({
     setReason("");
     setStage("idle");
     setError("");
+    setEstimatedDeliveryDate("");
+    setShippingMethod("");
   }, [open]);
 
   useEffect(() => {
@@ -146,7 +152,7 @@ export default function ManageStatusModal({
       const response = await fetch(`/api/quote-requests/${requestId}/status`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action }),
+        body: JSON.stringify({ action, ...(action === "START_SHIPPING" ? { estimatedDeliveryDate, shippingMethod } : {}) }),
       });
       const result = (await response.json()) as { error?: string } & ManageStatusResult;
       if (!response.ok) throw new Error(result.error || "No fue posible actualizar la solicitud");
@@ -220,7 +226,7 @@ export default function ManageStatusModal({
         ) : step === "shipping-confirm" ? (
           <div className="flex justify-end gap-2">
             <SecondaryButton size="sm" onClick={() => setStep("choose")} disabled={isBusy}>Cancelar</SecondaryButton>
-            <PrimaryButton size="sm" onClick={() => confirmTransition("START_SHIPPING")} disabled={isBusy} icon={isBusy ? Loader2 : undefined} className={isBusy ? "[&_svg]:animate-spin" : ""}>{isBusy ? "Actualizando..." : "Confirmar despacho"}</PrimaryButton>
+            <PrimaryButton size="sm" onClick={() => confirmTransition("START_SHIPPING")} disabled={isBusy || !estimatedDeliveryDate || !shippingMethod.trim() || !hasPaid} icon={isBusy ? Loader2 : undefined} className={isBusy ? "[&_svg]:animate-spin" : ""}>{isBusy ? "Actualizando..." : "Confirmar despacho"}</PrimaryButton>
           </div>
         ) : step === "mandate-confirm" ? (
           <div className="flex justify-end gap-2">
@@ -276,11 +282,12 @@ export default function ManageStatusModal({
           </button>}
           {currentStatus === "ACCEPTED" && <button
             type="button"
-            onClick={() => setStep("shipping-confirm")}
-            className="flex w-full items-start gap-3 rounded-xl border border-[var(--border)] p-4 text-left transition hover:border-[var(--blue)] hover:bg-[var(--background)]"
+            onClick={() => hasPaid && setStep("shipping-confirm")}
+            disabled={!hasPaid}
+            className={`flex w-full items-start gap-3 rounded-xl border p-4 text-left transition ${hasPaid ? "border-[var(--border)] hover:border-[var(--blue)] hover:bg-[var(--background)]" : "cursor-not-allowed border-amber-200 bg-amber-50"}`}
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-[var(--blue)]"><UserCog className="h-4 w-4" /></div>
-            <div><p className="text-sm font-bold text-[var(--navy)]">Iniciar despacho</p><p className="mt-1 text-xs text-[var(--text-secondary)]">Confirma que el medicamento entra en proceso de despacho o envío.</p></div>
+            <div><p className="text-sm font-bold text-[var(--navy)]">Iniciar despacho</p><p className="mt-1 text-xs text-[var(--text-secondary)]">{hasPaid ? "Confirma que el medicamento entra en proceso de despacho o envío." : "Bloqueado hasta que exista un pago confirmado."}</p></div>
           </button>}
           {!["REJECTED", "CANCELLED", "COMPLETED"].includes(currentStatus) && <button
             type="button"
@@ -367,9 +374,17 @@ export default function ManageStatusModal({
             </div>
           )}
         </motion.div>
-      ) : step === "shipping-confirm" || step === "complete-confirm" ? (
+      ) : step === "shipping-confirm" ? (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+          <p className="text-sm text-[var(--text-secondary)]">Estos datos se mostrarán como nota de seguimiento y se incluirán en el correo al cliente. No se crean columnas nuevas en la base de datos.</p>
+          <label className="block text-xs font-bold text-[var(--navy)]">Fecha estimada de entrega<input type="date" value={estimatedDeliveryDate} onChange={(event) => setEstimatedDeliveryDate(event.target.value)} className="field-input mt-2" /></label>
+          <label className="block text-xs font-bold text-[var(--navy)]">Forma de envío<input value={shippingMethod} onChange={(event) => setShippingMethod(event.target.value)} maxLength={120} placeholder="Ej.: courier, retiro en sucursal o transporte AXESSIA" className="field-input mt-2" /></label>
+          <p className="text-xs text-[var(--text-secondary)]">La fecha es referencial y puede modificarse por inconvenientes o factores externos.</p>
+          {stage === "error" && <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-600" /><p className="text-xs font-semibold text-rose-700">{error}</p></div>}
+        </motion.div>
+      ) : step === "complete-confirm" ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
-          <p className="text-sm text-[var(--text-secondary)]">{step === "shipping-confirm" ? "Al confirmar, la solicitud pasará a En despacho y el cambio quedará registrado en su historial." : "Al confirmar, la solicitud pasará a Finalizada y el cambio quedará registrado en su historial."}</p>
+          <p className="text-sm text-[var(--text-secondary)]">Al confirmar, la solicitud pasará a Finalizada y el cambio quedará registrado en su historial.</p>
           {stage === "error" && <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-600" /><p className="text-xs font-semibold text-rose-700">{error}</p></div>}
         </motion.div>
       ) : step === "reactivate" ? (
