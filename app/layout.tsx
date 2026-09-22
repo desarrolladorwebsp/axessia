@@ -1,23 +1,10 @@
 import type { Metadata } from "next";
-import { Montserrat, Plus_Jakarta_Sans } from "next/font/google";
 import Navbar from "@/components/Navbar";
 import { QuoteModalProvider } from "@/components/QuoteModal";
 import Footer from "@/components/Footer";
 import { getAxessiaLegalDetails } from "@/lib/axessia-legal";
 import { getPortalCustomer } from "@/lib/customer-access";
 import "./globals.css";
-
-const montserrat = Montserrat({
-  variable: "--font-display",
-  subsets: ["latin"],
-  display: "swap",
-});
-
-const plusJakartaSans = Plus_Jakarta_Sans({
-  variable: "--font-sans",
-  subsets: ["latin"],
-  display: "swap",
-});
 
 export const metadata: Metadata = {
   title: "AXESSIA | Tecnología y salud con confianza",
@@ -60,7 +47,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
   return (
     <html
       lang="es"
-      className={`${montserrat.variable} ${plusJakartaSans.variable} h-full antialiased`}
+      className="h-full antialiased"
     >
       <body className="min-h-full bg-[var(--background)] text-[var(--text)]">
           <QuoteModalProvider accountContact={accountContact}>
