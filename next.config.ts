@@ -5,6 +5,7 @@ const nextConfig: NextConfig = {
     cpus: 1,
     workerThreads: false,
     webpackBuildWorker: false,
+    useTypeScriptCli: false,
   },
   // cPanel's process limit prevents Next from starting its duplicate type-check worker.
   // TypeScript remains checked strictly in local/CI validation before deployment.
