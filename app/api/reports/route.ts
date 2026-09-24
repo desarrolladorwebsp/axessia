@@ -3,8 +3,9 @@ import { PDFDocument, StandardFonts, rgb } from "pdf-lib";
 import { PaymentStatus, QuoteRequestStatus, QuoteStatus } from "@prisma/client";
 import { getInternalActor } from "@/lib/internal-access";
 import { prisma } from "@/lib/prisma";
+import { quotePriceBreakdownFromItems } from "@/lib/quote-pricing";
 
-type ReportType = "requests" | "customers" | "suppliers" | "quotes" | "sales" | "executives";
+type ReportType = "requests" | "customers" | "suppliers" | "quotes" | "sales" | "executives" | "timings";
 type ReportRow = Record<string, string | number>;
 
 const labels: Record<ReportType, string> = {
@@ -14,6 +15,7 @@ const labels: Record<ReportType, string> = {
   quotes: "Cotizaciones",
   sales: "Ventas",
   executives: "Por ejecutivo",
+  timings: "Tiempos de gestión",
 };
 
 function parseDate(value: string | null, end = false) {
@@ -35,7 +37,60 @@ function asDate(value: Date) {
   return value.toISOString().slice(0, 10);
 }
 
+function formatDuration(hours: number) {
+  if (hours < 24) return `${hours.toFixed(1)} h`;
+  return `${(hours / 24).toFixed(1)} días`;
+}
+
+function median(values: number[]) {
+  const sorted = [...values].sort((a, b) => a - b);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 ? sorted[middle] : (sorted[middle - 1] + sorted[middle]) / 2;
+}
+
+async function getTimingRows(from?: Date, to?: Date): Promise<ReportRow[]> {
+  const where = from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : undefined;
+  const requests = await prisma.quoteRequest.findMany({
+    where,
+    take: 5000,
+    select: {
+      createdAt: true,
+      events: { orderBy: { createdAt: "asc" }, select: { eventType: true, createdAt: true } },
+    },
+  });
+  const stages = [
+    { label: "Recepción -> asignación", start: "REQUEST_RECEIVED", end: "EXECUTIVE_ASSIGNED", fallbackStart: true },
+    { label: "Asignación -> cotización enviada", start: "EXECUTIVE_ASSIGNED", end: "QUOTE_SENT" },
+    { label: "Cotización enviada -> aceptación", start: "QUOTE_SENT", end: "QUOTE_ACCEPTED" },
+    { label: "Aceptación -> pago confirmado", start: "QUOTE_ACCEPTED", end: "PAYMENT_CONFIRMED" },
+    { label: "Aceptación -> entrega/finalización", start: "QUOTE_ACCEPTED", end: "REQUEST_COMPLETED" },
+  ] as const;
+  return stages.map((stage) => {
+    const durations: number[] = [];
+    for (const request of requests) {
+      const start = ("fallbackStart" in stage && stage.fallbackStart)
+        ? request.events.find((event) => event.eventType === stage.start)?.createdAt ?? request.createdAt
+        : request.events.find((event) => event.eventType === stage.start)?.createdAt;
+      const end = request.events.find((event) => event.eventType === stage.end)?.createdAt;
+      if (!start || !end || end.getTime() < start.getTime()) continue;
+      durations.push((end.getTime() - start.getTime()) / 3600000);
+    }
+    const average = durations.length ? durations.reduce((sum, value) => sum + value, 0) / durations.length : 0;
+    return {
+      Etapa: stage.label,
+      "Casos medidos": durations.length,
+      "Casos del período": requests.length,
+      "Cobertura": `${requests.length ? Math.round((durations.length / requests.length) * 100) : 0}%`,
+      Promedio: durations.length ? formatDuration(average) : "Sin datos",
+      Mediana: durations.length ? formatDuration(median(durations)) : "Sin datos",
+      Mínimo: durations.length ? formatDuration(Math.min(...durations)) : "Sin datos",
+      Máximo: durations.length ? formatDuration(Math.max(...durations)) : "Sin datos",
+    };
+  });
+}
+
 async function getRows(type: ReportType, from?: Date, to?: Date, status?: string, executiveId?: string): Promise<ReportRow[]> {
+  if (type === "timings") return getTimingRows(from, to);
   if (type === "executives") {
     const where = { ...(from || to ? { createdAt: { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } } : {}), ...(executiveId === "unassigned" ? { assignedExecutiveId: null } : executiveId ? { assignedExecutiveId: executiveId } : {}) };
     const records = await prisma.quoteRequest.findMany({ where, take: 5000, select: { status: true, assignedExecutive: { select: { id: true, firstName: true, lastName: true } }, quotes: { select: { status: true, payments: { where: { status: PaymentStatus.PAID }, select: { amount: true } } } } } });
@@ -57,9 +112,23 @@ async function getRows(type: ReportType, from?: Date, to?: Date, status?: string
     const records = await prisma.quote.findMany({
       where: { status: QuoteStatus.ACCEPTED, payments: { some: { status: PaymentStatus.PAID, ...(paidAt ? { paidAt } : {}) } } },
       orderBy: { createdAt: "desc" }, take: 5000,
-      select: { quoteNumber: true, customer: { select: { name: true, email: true } }, request: { select: { requestNumber: true } }, items: { select: { productName: true, quantity: true, unitPrice: true, totalPrice: true } }, payments: { where: { status: PaymentStatus.PAID }, orderBy: { paidAt: "desc" }, take: 1, select: { paidAt: true, amount: true } } },
-    });
-    return records.flatMap((quote) => quote.items.map((item) => ({ Cotización: quote.quoteNumber ?? "", Solicitud: quote.request.requestNumber ?? "", Cliente: quote.customer.name, Correo: quote.customer.email, Producto: item.productName, Cantidad: item.quantity, Precio: item.unitPrice?.toString() ?? "", Total: item.totalPrice?.toString() ?? "", Costo: "No registrado", "Fecha de pago": quote.payments[0]?.paidAt ? asDate(quote.payments[0].paidAt) : "" })));
+      select: { quoteNumber: true, customer: { select: { name: true, email: true } }, request: { select: { requestNumber: true } }, items: { select: { productName: true, quantity: true, unitPrice: true, totalPrice: true, unitCost: true } }, payments: { where: { status: PaymentStatus.PAID }, orderBy: { paidAt: "desc" }, take: 1, select: { paidAt: true, amount: true } } },
+    } as never) as unknown as Array<{
+      quoteNumber: string | null;
+      customer: { name: string; email: string };
+      request: { requestNumber: string | null };
+      items: Array<{ productName: string; quantity: number; unitPrice: { toString(): string } | null; totalPrice: { toString(): string } | null; unitCost: unknown }>;
+      payments: Array<{ paidAt: Date | null; amount: unknown }>;
+    }>;
+    return records.flatMap((quote) => quote.items.map((item) => {
+      const cost = item.unitCost == null ? null : Number(item.unitCost);
+      const costTotal = cost == null ? null : cost * item.quantity;
+      const breakdown = quotePriceBreakdownFromItems(quote.items);
+      const itemSubtotal = item.totalPrice == null ? null : Number(item.totalPrice);
+      const itemIva = itemSubtotal == null ? null : Math.round(itemSubtotal * 0.19);
+      const itemTotal = itemSubtotal == null || itemIva == null ? null : itemSubtotal + itemIva;
+      return { Cotización: quote.quoteNumber ?? "", Solicitud: quote.request.requestNumber ?? "", Cliente: quote.customer.name, Correo: quote.customer.email, Producto: item.productName, Cantidad: item.quantity, Precio: item.unitPrice?.toString() ?? "", "Subtotal neto": itemSubtotal == null ? "" : itemSubtotal.toFixed(2), "IVA (19%)": itemIva == null ? "" : itemIva.toFixed(2), "Total con IVA": itemTotal == null ? breakdown.total.toFixed(2) : itemTotal.toFixed(2), "Costo unitario interno": cost == null ? "No registrado" : cost.toFixed(2), "Costo total interno": costTotal == null ? "No registrado" : costTotal.toFixed(2), "Margen bruto interno": itemSubtotal == null || costTotal == null ? "No registrado" : (itemSubtotal - costTotal).toFixed(2), "Fecha de pago": quote.payments[0]?.paidAt ? asDate(quote.payments[0].paidAt) : "" };
+    }));
   }
   const createdAt = from || to ? { ...(from ? { gte: from } : {}), ...(to ? { lte: to } : {}) } : undefined;
   if (type === "requests") {

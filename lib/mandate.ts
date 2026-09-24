@@ -83,10 +83,5 @@ export async function generateMandatePdf(request: MandateRequestData, company: A
   page.drawText(`Nombre: ${request.mandateName}`, { x: margin, y: cursor - 31, size: 9, font: regular, color: muted });
   page.drawText(`RUT: ${request.mandateRut}`, { x: margin, y: cursor - 45, size: 9, font: regular, color: muted });
 
-  page.drawRectangle({ x: width - margin - 190, y: cursor - 95, width: 190, height: 92, borderColor: muted, borderWidth: 0.7 });
-  page.drawText("ESPACIO PARA CERTIFICACIÓN", { x: width - margin - 174, y: cursor - 21, size: 8, font: bold, color: muted });
-  page.drawText("NOTARIAL", { x: width - margin - 128, y: cursor - 35, size: 8, font: bold, color: muted });
-  page.drawText(`Emitido por AXESSIA · ${request.requestNumber}`, { x: margin, y: 38, size: 8, font: regular, color: muted });
-
   return pdf.save();
 }

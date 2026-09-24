@@ -13,7 +13,7 @@ export type DevQuoteRequestRecord = {
   requesterCity: string;
   patientName: string | null;
   patientRut: string | null;
-  status: "RECEIVED" | "SOURCING" | "QUOTED" | "AWAITING_DECISION" | "ACCEPTED" | "SHIPPING" | "REJECTED" | "CANCELLED" | "COMPLETED";
+  status: "RECEIVED" | "SOURCING" | "QUOTED" | "AWAITING_DECISION" | "ACCEPTED" | "PAID" | "SHIPPING" | "REJECTED" | "CANCELLED" | "COMPLETED";
   origin: "WEB" | "EJECUTIVO";
   productType?: "MEDICATION" | "MEDICAL_DEVICE";
   price?: number | null;
@@ -24,6 +24,7 @@ export type DevQuoteRequestRecord = {
   assignedExecutive?: { id: string; firstName: string; lastName: string } | null;
   customer: {
     id: string;
+    productId?: string | null;
     name: string;
     phone: string;
     email: string;
@@ -153,6 +154,7 @@ export type DevQuoteRecord = {
     expirationDate: string | null;
     unitPrice: number | null;
     totalPrice: number | null;
+    unitCost?: number | null;
   }>;
 };
 

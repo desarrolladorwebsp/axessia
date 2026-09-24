@@ -308,6 +308,7 @@ export function renderMandateEmail(input: {
     introHtml: `
       <p>Adjuntamos el mandato AXESSIA asociado a tu solicitud. El documento PDF va incluido en este correo.</p>
       <p>Revísalo, fírmalo y realiza la gestión notarial que corresponda. Luego, devuélvelo a AXESSIA por los canales indicados.</p>
+      <p><strong>Si creas una cuenta en AXESSIA, será más fácil continuar el trámite y adjuntar tus documentos desde tu portal.</strong> Si prefieres no crear una cuenta, también puedes enviar el documento firmado a <a href="mailto:administracion@axessia.cl" style="color:#087FD5;text-decoration:none;">administracion@axessia.cl</a>.</p>
     `,
     infoRows: [{ label: "Número de solicitud", value: input.requestNumber }],
     ctaLabel: "Ver estado de mi solicitud",

@@ -7,6 +7,9 @@ import { createDevRequestNotification, readDevQuotes, shouldUseJsonStorage, read
 import { sendQuoteRequestReceivedEmail, sendInternalQuoteRequestNotification } from "@/lib/services/email";
 import { normalizeSearchValue } from "@/lib/search";
 import { getInternalActor } from "@/lib/internal-access";
+import { CUSTOMER_SESSION_COOKIE, verifyCustomerSessionToken } from "@/lib/auth";
+import { cookies } from "next/headers";
+import { resolveQuoteRequestOrigin } from "@/lib/request-origin";
 import { isMedicalDevice, isProductType, parseMedicalDeviceItems, parseMedicationItems, type ProductType } from "@/lib/product-type";
 import { parseQuoteRequestBody } from "@/lib/quote-request-post";
 import type { QuoteRequestFormPayload } from "@/lib/quote-request-form-data";
@@ -63,10 +66,11 @@ export async function GET(request: NextRequest) {
       const total = sorted.length;
       const paginated = sorted.slice((page - 1) * limit, page * limit);
       const storedQuotes = await readDevQuotes();
-      const quoteCount = hasPeriod ? storedQuotes.filter((quote) => {
+      const issuedQuotes = storedQuotes.filter((quote) => ["SENT", "ACCEPTED"].includes(quote.status));
+      const quoteCount = hasPeriod ? issuedQuotes.filter((quote) => {
         const createdAt = new Date(quote.createdAt);
         return createdAt >= monthStart && createdAt < monthEnd;
-      }).length : storedQuotes.length;
+      }).length : issuedQuotes.length;
 
       const statusCounts = sorted.reduce<Record<string, number>>((accumulator, record) => {
         accumulator[record.status] = (accumulator[record.status] ?? 0) + 1;
@@ -162,7 +166,10 @@ export async function GET(request: NextRequest) {
         where,
       }),
       prisma.quote.count({
-        where: hasPeriod ? { createdAt: { gte: monthStart, lt: monthEnd } } : {},
+        where: {
+          status: { in: ["SENT", "ACCEPTED"] },
+          ...(hasPeriod ? { createdAt: { gte: monthStart, lt: monthEnd } } : {}),
+        },
       }),
     ]);
 
@@ -232,10 +239,14 @@ export async function POST(request: Request) {
   }
 
   const selectedCustomerId = typeof payload.customerId === "string" ? payload.customerId.trim() : "";
-  const internalActor = await getInternalActor();
+  const cookieStore = await cookies();
+  const hasCustomerSession = Boolean(verifyCustomerSessionToken(cookieStore.get(CUSTOMER_SESSION_COOKIE)?.value));
+  // If the request comes from the customer portal, it must remain WEB even
+  // when the same browser also has an old internal-session cookie.
+  const internalActor = hasCustomerSession ? null : await getInternalActor();
   if (selectedCustomerId && !internalActor) return NextResponse.json({ error: "No autorizado." }, { status: 401 });
   // El origen se determina en el servidor según quién ejecuta la creación; el cliente nunca lo envía ni lo controla.
-  const origin = internalActor ? "EJECUTIVO" as const : "WEB" as const;
+  const origin = resolveQuoteRequestOrigin({ hasCustomerSession, hasInternalActor: Boolean(internalActor) });
 
   if (!payload.acceptsPolicies || !payload.acceptsDataTreatment) {
     return NextResponse.json({ error: "Los consentimientos son obligatorios." }, { status: 400 });

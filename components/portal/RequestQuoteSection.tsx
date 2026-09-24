@@ -1,10 +1,12 @@
 import { Download } from "lucide-react";
 import QuoteActions from "@/components/portal/QuoteActions";
+import TransferPaymentUpload from "@/components/TransferPaymentUpload";
 import { StatusBadge } from "@/components/portal/StatusBadge";
 import { formatDate, formatDateTime, formatMoney } from "@/components/portal/format";
 import { isMedicalDevice, quoteConditionLabel } from "@/lib/product-type";
 import { portalRequestDetailPath } from "@/lib/portal/paths";
 import { formatEstimatedShippingDays } from "@/lib/quote-items";
+import type { QuotePriceBreakdown } from "@/lib/quote-pricing";
 import { quoteStatusLabel, QUOTE_STATUS_TONES } from "@/lib/quote-status";
 
 type QuoteItem = {
@@ -29,6 +31,7 @@ type PaymentSummary = {
   amount: string;
   currency: string;
   providerReference: string | null;
+  provider: string;
   failureReason: string | null;
   helpMessage: string | null;
 };
@@ -39,6 +42,7 @@ export type PortalCurrentQuote = {
   version: number;
   status: string;
   total: string | null;
+  priceBreakdown: QuotePriceBreakdown;
   validUntil: string | null;
   estimatedShippingDays: number | null;
   sentAt: string | null;
@@ -73,7 +77,8 @@ export function RequestQuoteSection({
               <p className="text-sm font-extrabold text-[var(--navy)]">
                 {quote.quoteNumber || `Versión ${quote.version}`}
               </p>
-              <p className="mt-1 text-2xl font-extrabold text-[var(--navy)]">{formatMoney(quote.total)}</p>
+              <p className="mt-1 text-2xl font-extrabold text-[var(--navy)]">{formatMoney(quote.priceBreakdown.total)}</p>
+              <p className="mt-1 text-xs text-[var(--text-secondary)]">Incluye IVA (19%) · Subtotal {formatMoney(quote.priceBreakdown.subtotal)} · IVA {formatMoney(quote.priceBreakdown.iva)}</p>
             </div>
             <StatusBadge label={quoteStatusLabel(quote.status)} tone={QUOTE_STATUS_TONES[quote.status]} />
           </div>
@@ -138,6 +143,7 @@ export function RequestQuoteSection({
             confirmOnReturn={confirmOnReturn}
             returnPath={portalRequestDetailPath(requestId)}
           />
+          {quote.status === "ACCEPTED" ? <div className="mt-4"><TransferPaymentUpload requestId={requestId} paymentStatus={quote.payment?.status} /></div> : null}
         </>
       )}
     </section>

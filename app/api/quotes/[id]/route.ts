@@ -5,6 +5,7 @@ import { parseQuoteItems, computeQuoteTotal, parseValidUntil, parseEstimatedShip
 import { attachSuppliersToQuoteItems } from "@/lib/quote-item-suppliers";
 import { isProductType } from "@/lib/product-type";
 import { getInternalActor } from "@/lib/internal-access";
+import { attachProductCosts } from "@/lib/product-costs";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -94,10 +95,11 @@ export async function PATCH(request: NextRequest, { params }: RouteContext) {
     const total = computeQuoteTotal(items);
 
     const quote = await prisma.$transaction(async (transaction) => {
+      const itemsWithCosts = await attachProductCosts(transaction, items);
       await transaction.quoteItem.deleteMany({ where: { quoteId: id } });
       const updated = await transaction.quote.update({
         where: { id },
-        data: { status, total, validUntil, estimatedShippingDays, items: { create: items } },
+        data: { status, total, validUntil, estimatedShippingDays, items: { create: itemsWithCosts as never } },
         include: { items: { include: { supplier: { select: { id: true, name: true } } } }, customer: { select: { id: true, name: true, email: true } }, request: { select: { id: true, requestNumber: true, requesterName: true, requesterEmail: true } } },
       });
       if (!asDraft && existing.request.status !== "QUOTED") {

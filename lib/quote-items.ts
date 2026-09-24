@@ -1,8 +1,10 @@
 import { isMedicalDevice, isProductType, type ProductType } from "@/lib/product-type";
+import { quotePriceBreakdownFromItems } from "@/lib/quote-pricing";
 
 const quoteItemConditions = ["AVAILABLE", "SPECIAL_IMPORT"] as const;
 
 export type QuoteItemPayload = {
+  productId?: unknown;
   productType?: unknown;
   productName?: unknown;
   activeIngredient?: unknown;
@@ -26,6 +28,7 @@ export type QuoteItemPayload = {
 };
 
 export type ParsedQuoteItem = {
+  productId: string | null;
   productType: ProductType;
   productName: string;
   activeIngredient: string | null;
@@ -56,6 +59,7 @@ export type ParsedQuoteItem = {
 export function parseQuoteItems(rawItems: QuoteItemPayload[], asDraft: boolean, fallbackProductType: ProductType = "MEDICATION"): ParsedQuoteItem[] {
   return rawItems.map((item, index) => {
     const productType = isProductType(item.productType) ? item.productType : fallbackProductType;
+    const productId = typeof item.productId === "string" && item.productId.trim() ? item.productId.trim() : null;
     const device = isMedicalDevice(productType);
     const productName = typeof item.productName === "string" ? item.productName.trim() : "";
     const brand = typeof item.brand === "string" && item.brand.trim() ? item.brand.trim() : null;
@@ -85,6 +89,7 @@ export function parseQuoteItems(rawItems: QuoteItemPayload[], asDraft: boolean, 
     if (quantity < 0 || (unitPrice !== null && unitPrice < 0)) throw new Error(`Producto ${index + 1} inválido`);
     if (unitsPerPackage !== null && (!Number.isInteger(unitsPerPackage) || unitsPerPackage <= 0)) throw new Error(`Producto ${index + 1} inválido`);
     return {
+      productId,
       productType,
       productName,
       activeIngredient,
@@ -111,7 +116,7 @@ export function parseQuoteItems(rawItems: QuoteItemPayload[], asDraft: boolean, 
 }
 
 export function computeQuoteTotal(items: ParsedQuoteItem[]): number | null {
-  return items.some((item) => item.totalPrice !== null) ? items.reduce((sum, item) => sum + (item.totalPrice ?? 0), 0) : null;
+  return items.some((item) => item.totalPrice !== null) ? quotePriceBreakdownFromItems(items).total : null;
 }
 
 export type QuoteItemSupplierSnapshot = {

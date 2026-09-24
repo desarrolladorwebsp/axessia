@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { readTrackingToken } from "@/lib/public-tracking";
 import { serializePayment } from "@/lib/payments";
+import { quotePriceBreakdownFromItems } from "@/lib/quote-pricing";
 
 function unauthorized() {
   return NextResponse.json({ error: "La sesión de seguimiento no es válida o expiró." }, { status: 401 });
@@ -100,17 +101,18 @@ export async function GET(request: NextRequest) {
   const now = new Date();
   const quoteExpired = Boolean(decisionQuote?.validUntil && decisionQuote.validUntil < now && decisionQuote.status === "SENT");
   const canDecide = record.status === "AWAITING_DECISION" && decisionQuote?.status === "SENT" && !quoteExpired;
-  const canContinueAfterAccept = record.status === "ACCEPTED" && decisionQuote?.status === "ACCEPTED";
+  const canContinueAfterAccept = ["ACCEPTED", "PAID"].includes(record.status) && decisionQuote?.status === "ACCEPTED";
   const latestPayment = record.payments[0] ? serializePayment(record.payments[0]) : null;
   const hasPaid = record.payments.some((payment) => payment.status === "PAID");
 
   const quote = decisionQuote
     ? {
+        priceBreakdown: quotePriceBreakdownFromItems(decisionQuote.items.map((item) => ({ totalPrice: item.totalPrice?.toString() ?? null }))),
         id: decisionQuote.id,
         quoteNumber: decisionQuote.quoteNumber,
         version: decisionQuote.version,
         status: quoteExpired ? "EXPIRED" : decisionQuote.status,
-        total: money(decisionQuote.total),
+        total: money(quotePriceBreakdownFromItems(decisionQuote.items.map((item) => ({ totalPrice: item.totalPrice?.toString() ?? null }))).total),
         validUntil: decisionQuote.validUntil?.toISOString() ?? null,
         estimatedShippingDays: decisionQuote.estimatedShippingDays,
         acceptedAt: decisionQuote.acceptedAt?.toISOString() ?? null,

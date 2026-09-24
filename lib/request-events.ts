@@ -18,6 +18,8 @@ export const REQUEST_EVENT_LABELS: Record<string, string> = {
   REQUEST_REJECTED: "Solicitud rechazada",
   PAYMENT_STARTED: "Pago iniciado",
   PAYMENT_CONFIRMED: "Pago confirmado",
+  TRANSFER_RECEIPT_UPLOADED: "Comprobante de transferencia adjunto",
+  PAYMENT_MANUALLY_CONFIRMED: "Pago por transferencia confirmado",
   PAYMENT_CANCELLED: "Pago cancelado",
   PAYMENT_FAILED: "Pago fallido",
   PAYMENT_HELP_REQUESTED: "Ayuda con el pago solicitada",

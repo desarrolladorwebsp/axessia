@@ -7,6 +7,7 @@ export type SystemDocumentKind =
   | "mandate-signed"
   | "id-front"
   | "id-back"
+  | "transfer-receipt"
   | "related";
 
 const TYPE_PREFIX: Record<SystemDocumentKind, string> = {
@@ -15,6 +16,7 @@ const TYPE_PREFIX: Record<SystemDocumentKind, string> = {
   "mandate-signed": "Mandato-firmado",
   "id-front": "Cedula-frontal",
   "id-back": "Cedula-trasera",
+  "transfer-receipt": "Comprobante-transferencia",
   related: "Documento",
 };
 
@@ -37,6 +39,7 @@ export function resolveSystemDocumentKind(
   if (documentKind === "MANDATE") return "mandate-signed";
   if (documentKind === "ID_FRONT") return "id-front";
   if (documentKind === "ID_BACK") return "id-back";
+  if (documentKind === "TRANSFER_RECEIPT") return "transfer-receipt";
   return "related";
 }
 

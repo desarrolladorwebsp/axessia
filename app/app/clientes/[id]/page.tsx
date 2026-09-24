@@ -103,6 +103,7 @@ const requestStatusTones: Record<string, StatusTone> = {
   QUOTED: "accent",
   AWAITING_DECISION: "accent",
   ACCEPTED: "success",
+  PAID: "success",
   SHIPPING: "progress",
   REJECTED: "danger",
   CANCELLED: "neutral",

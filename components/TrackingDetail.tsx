@@ -16,10 +16,12 @@ import {
 } from "lucide-react";
 
 import { formatEstimatedShippingDays } from "@/lib/quote-items";
+import type { QuotePriceBreakdown } from "@/lib/quote-pricing";
 import { isMedicalDevice, quoteConditionLabel, type ProductType } from "@/lib/product-type";
 import { trackingStorageKey } from "@/lib/tracking-normalization";
 
 import TrackingRutGate from "@/components/TrackingRutGate";
+import TransferPaymentUpload from "@/components/TransferPaymentUpload";
 
 type QuoteItem = {
   id: string;
@@ -78,6 +80,7 @@ type Detail = {
     version: number;
     status: string;
     total: string | number | null;
+    priceBreakdown: QuotePriceBreakdown;
     validUntil: string | null;
     estimatedShippingDays?: number | null;
     acceptedAt: string | null;
@@ -98,6 +101,7 @@ const labels: Record<string, string> = {
   QUOTED: "Cotizada",
   AWAITING_DECISION: "Esperando respuesta",
   ACCEPTED: "Aceptada",
+  PAID: "Pagado",
   SHIPPING: "En despacho",
   COMPLETED: "Finalizada",
   REJECTED: "Rechazada",
@@ -202,7 +206,7 @@ export default function TrackingDetail({ requestNumber }: { requestNumber: strin
   const isBusy = busy !== null;
 
   const paymentStatus = detail?.payment?.status;
-  const quoteAccepted = detail?.status === "ACCEPTED" && detail.quote?.status === "ACCEPTED";
+  const quoteAccepted = Boolean(detail && ["ACCEPTED", "PAID"].includes(detail.status) && detail.quote?.status === "ACCEPTED");
   const shippingEstimate = formatEstimatedShippingDays(detail?.quote?.estimatedShippingDays);
   const paymentPaid = paymentStatus === "PAID";
   const paymentFailed = paymentStatus === "FAILED" || paymentStatus === "CANCELLED";
@@ -521,7 +525,11 @@ export default function TrackingDetail({ requestNumber }: { requestNumber: strin
               ))}
             </div>
 
-            <p className="mt-6 text-right text-2xl font-bold text-[var(--navy)]">Total: {money(detail.quote.total)}</p>
+            <div className="mt-6 ml-auto max-w-sm space-y-2 rounded-xl border border-[var(--border)] bg-[var(--background)] p-4 text-sm">
+              <div className="flex justify-between gap-4 text-[var(--text-secondary)]"><span>Subtotal</span><strong>{money(detail.quote.priceBreakdown.subtotal)}</strong></div>
+              <div className="flex justify-between gap-4 text-[var(--text-secondary)]"><span>IVA (19%)</span><strong>{money(detail.quote.priceBreakdown.iva)}</strong></div>
+              <div className="flex justify-between gap-4 border-t border-[var(--border)] pt-2 text-lg font-extrabold text-[var(--navy)]"><span>Total con IVA</span><strong>{money(detail.quote.priceBreakdown.total)}</strong></div>
+            </div>
 
             {detail.canDecide && (
               <div className="mt-8 flex flex-wrap gap-3 border-t border-[var(--border)] pt-6">
@@ -617,6 +625,9 @@ export default function TrackingDetail({ requestNumber }: { requestNumber: strin
                   <div className="flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm font-semibold text-emerald-800">
                     <CheckCircle2 size={18} /> Tu pago fue confirmado por la pasarela. No necesitas repetir esta operación.
                   </div>
+                )}
+                {!paymentPaid && (
+                  <TransferPaymentUpload trackingToken={getToken(requestNumber)} paymentStatus={detail.payment?.status} onUploaded={loadDetail} />
                 )}
               </div>
             )}

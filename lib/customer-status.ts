@@ -1,10 +1,10 @@
 export type CustomerStatusLabel = "Activo" | "En proceso" | "Pendiente" | "Finalizado";
 
 const IN_PROCESS_STATUSES = new Set(["RECEIVED", "SOURCING", "QUOTED", "AWAITING_DECISION"]);
-const ACTIVE_STATUSES = new Set(["ACCEPTED", "SHIPPING", "COMPLETED"]);
+const ACTIVE_STATUSES = new Set(["ACCEPTED", "PAID", "SHIPPING", "COMPLETED"]);
 const CLOSED_STATUSES = new Set(["REJECTED", "CANCELLED"]);
 
-export const OPEN_REQUEST_STATUSES = ["RECEIVED", "SOURCING", "QUOTED", "AWAITING_DECISION", "ACCEPTED", "SHIPPING"] as const;
+export const OPEN_REQUEST_STATUSES = ["RECEIVED", "SOURCING", "QUOTED", "AWAITING_DECISION", "ACCEPTED", "PAID", "SHIPPING"] as const;
 
 export function customerStatusLabel(latestStatus: string | null | undefined): CustomerStatusLabel {
   if (latestStatus && IN_PROCESS_STATUSES.has(latestStatus)) return "En proceso";

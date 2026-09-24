@@ -1,0 +1,9 @@
+-- Add the explicit paid request state and the manual transfer payment provider.
+ALTER TABLE `QuoteRequest`
+  MODIFY `status` ENUM('RECEIVED', 'SOURCING', 'QUOTED', 'AWAITING_DECISION', 'ACCEPTED', 'PAID', 'SHIPPING', 'REJECTED', 'CANCELLED', 'COMPLETED') NOT NULL DEFAULT 'RECEIVED';
+
+ALTER TABLE `Payment`
+  MODIFY `provider` ENUM('SIMULATED', 'BANCHILE', 'TRANSFER') NOT NULL DEFAULT 'SIMULATED';
+
+ALTER TABLE `ClientDocument`
+  MODIFY `documentKind` ENUM('MANDATE', 'ID_FRONT', 'ID_BACK', 'TRANSFER_RECEIPT', 'OTHER') NULL;

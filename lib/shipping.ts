@@ -23,8 +23,8 @@ export function buildShippingNote(input: { estimatedDeliveryDate: string; shippi
 }
 
 export function validateShippingStart(input: ShippingStartInput): { ok: true; estimatedDeliveryDate: string; shippingMethod: string } | { ok: false; error: string } {
-  if (input.requestStatus !== "ACCEPTED") {
-    return { ok: false, error: `La solicitud debe estar en ${REQUEST_STATUS_LABELS.ACCEPTED} para iniciar el despacho.` };
+  if (input.requestStatus !== "PAID" && !(input.requestStatus === "ACCEPTED" && input.hasPaid)) {
+    return { ok: false, error: `La solicitud debe estar en ${REQUEST_STATUS_LABELS.PAID} (pago confirmado) para iniciar el despacho.` };
   }
   if (!input.hasPaid) {
     return { ok: false, error: "No se puede iniciar el despacho: la cotización aceptada aún no registra un pago confirmado." };

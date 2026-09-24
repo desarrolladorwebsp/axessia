@@ -1,4 +1,5 @@
 import { isMedicalDevice, type ProductType } from "@/lib/product-type";
+import { quotePriceBreakdownFromSubtotal } from "@/lib/quote-pricing";
 
 export type MedicationSeed = {
   commercialName: string;
@@ -17,6 +18,7 @@ export type DeviceSeed = {
 
 export type QuoteDraftItem = {
   clientId: string;
+  productId: string;
   productType: ProductType;
   productName: string;
   activeIngredient: string;
@@ -54,8 +56,6 @@ export const QUOTE_LINE_TYPE_LABELS: Record<ProductType, string> = {
   MEDICAL_DEVICE: "Equipo médico",
 };
 
-export const IVA_RATE = 0.19;
-
 export function newDraftClientId() {
   if (typeof crypto !== "undefined" && "randomUUID" in crypto) return crypto.randomUUID();
   return `item-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
@@ -66,6 +66,7 @@ export function emptyItem(productType: ProductType, seed?: MedicationSeed | Devi
   const medicationSeed = seed && "commercialName" in seed ? seed : null;
   return {
     clientId: newDraftClientId(),
+    productId: "",
     productType,
     productName: deviceSeed?.name ?? medicationSeed?.commercialName ?? "",
     activeIngredient: medicationSeed?.activeIngredient ?? "",
@@ -103,8 +104,7 @@ export function formatClp(value: number) {
 
 export function quoteMoneyBreakdown(items: QuoteDraftItem[]) {
   const subtotal = items.reduce((sum, item) => sum + lineAmount(item), 0);
-  const iva = Math.round(subtotal * IVA_RATE);
-  return { subtotal, iva, total: subtotal + iva };
+  return quotePriceBreakdownFromSubtotal(subtotal);
 }
 
 export function isIncompleteQuoteLine(item: QuoteDraftItem) {

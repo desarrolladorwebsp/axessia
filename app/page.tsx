@@ -24,7 +24,7 @@ export default function Home() {
           </h1>
           <div className="brand-gradient mt-7 h-1 w-12 rounded-full" />
           <p className="hero-description mt-7 max-w-[430px] text-base leading-7 text-[var(--text-secondary)] sm:text-lg">
-            Conectamos necesidades de salud con las mejores opciones disponibles en el mundo.
+            Cuando el tratamiento que necesitas existe en algún lugar del mundo pero no está disponible en Chile, o cuesta más de lo que esperarías, te ayudamos a llegar a él.
           </p>
           <QuoteTrigger
             className="brand-gradient mt-8 inline-flex min-h-11 items-center gap-5 rounded-lg px-6 py-3 text-sm font-bold text-white shadow-[0_12px_28px_rgba(8,127,213,0.25)] transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--blue)] focus-visible:ring-offset-2"

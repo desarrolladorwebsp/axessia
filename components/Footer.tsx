@@ -4,7 +4,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { Clock3, FileText, Mail, MapPin, MessageCircle, Phone, ShieldCheck } from "lucide-react";
+import { Clock3, FileText, Mail, MapPin, MessageCircle, ShieldCheck } from "lucide-react";
 
 // lucide-react no incluye íconos de marcas (Instagram/Facebook); se definen manualmente.
 function InstagramIcon({ size = 19 }: { size?: number }) {
@@ -75,8 +75,8 @@ export default function Footer({ legalRut }: { legalRut?: string }) {
         <motion.div className="footer-contact" initial="hidden" whileInView="visible" viewport={{ once: true, amount: 0.2 }} variants={reveal}>
           <h2>Contacto</h2>
           <ContactLine icon={Mail} text="Correo disponible próximamente" />
-          <ContactLine icon={Phone} text="+56 9 6732 9309" href="tel:+56967329309" />
-          <ContactLine icon={Phone} text="+56 9 7992 8080" href="tel:+56979928080" />
+          <ContactLine icon={MessageCircle} text="+56 9 6732 9309" href="https://wa.me/56967329309" ariaLabel="Contactar por WhatsApp al +56 9 6732 9309" />
+          <ContactLine icon={MessageCircle} text="+56 9 7992 8080" href="https://wa.me/56979928080" ariaLabel="Contactar por WhatsApp al +56 9 7992 8080" />
           <ContactLine icon={MapPin} text="Ubicación disponible próximamente" />
           <ContactLine icon={Clock3} text="Horario disponible próximamente" />
         </motion.div>
@@ -154,6 +154,6 @@ function FooterColumn({ title, items }: { title: string; items: string[][] }) {
   );
 }
 
-function ContactLine({ icon: Icon, text, href }: { icon: typeof Mail; text: string; href?: string }) {
-  return <p className="footer-contact-line"><Icon size={17} aria-hidden="true" />{href ? <a href={href}>{text}</a> : <span>{text}</span>}</p>;
+function ContactLine({ icon: Icon, text, href, ariaLabel }: { icon: typeof Mail; text: string; href?: string; ariaLabel?: string }) {
+  return <p className="footer-contact-line"><Icon size={17} aria-hidden="true" />{href ? <a href={href} target="_blank" rel="noreferrer" aria-label={ariaLabel}>{text}</a> : <span>{text}</span>}</p>;
 }

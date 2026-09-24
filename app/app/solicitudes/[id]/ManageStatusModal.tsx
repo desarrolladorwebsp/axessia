@@ -17,7 +17,7 @@ export type ManageStatusResult = {
   note?: { id: string; executiveName: string; message: string; createdAt: string };
 };
 
-type Step = "choose" | "assign-select" | "assign-confirm" | "reject" | "reactivate" | "reactivate-confirm" | "mandate-confirm" | "shipping-confirm" | "complete-confirm";
+type Step = "choose" | "assign-select" | "assign-confirm" | "reject" | "reactivate" | "reactivate-confirm" | "payment-confirm" | "mandate-confirm" | "shipping-confirm" | "complete-confirm";
 type Stage = "idle" | "submitting" | "success" | "error";
 
 const manageableRoles = ["EJECUTIVO", "ADMINISTRADOR"];
@@ -28,6 +28,7 @@ export default function ManageStatusModal({
   requestId,
   currentStatus,
   hasPaid,
+  hasTransferReceipt,
   onUpdated,
 }: {
   open: boolean;
@@ -35,6 +36,7 @@ export default function ManageStatusModal({
   requestId: string;
   currentStatus: string;
   hasPaid: boolean;
+  hasTransferReceipt: boolean;
   onUpdated: (result: ManageStatusResult) => void;
 }) {
   const [step, setStep] = useState<Step>("choose");
@@ -46,9 +48,11 @@ export default function ManageStatusModal({
   const [error, setError] = useState("");
   const [estimatedDeliveryDate, setEstimatedDeliveryDate] = useState("");
   const [shippingMethod, setShippingMethod] = useState("");
+  const [paymentInfo, setPaymentInfo] = useState("");
 
   useEffect(() => {
     if (!open) return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- reset the modal workflow when it opens
     setStep("choose");
     setSelectedExecutiveId("");
     setReason("");
@@ -56,6 +60,7 @@ export default function ManageStatusModal({
     setError("");
     setEstimatedDeliveryDate("");
     setShippingMethod("");
+    setPaymentInfo("");
   }, [open]);
 
   useEffect(() => {
@@ -144,7 +149,7 @@ export default function ManageStatusModal({
     }
   };
 
-  const confirmTransition = async (action: "SEND_MANDATE" | "START_SHIPPING" | "COMPLETE") => {
+  const confirmTransition = async (action: "CONFIRM_PAYMENT" | "SEND_MANDATE" | "START_SHIPPING" | "COMPLETE") => {
     if (isBusy) return;
     try {
       setStage("submitting");
@@ -152,7 +157,7 @@ export default function ManageStatusModal({
       const response = await fetch(`/api/quote-requests/${requestId}/status`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ action, ...(action === "START_SHIPPING" ? { estimatedDeliveryDate, shippingMethod } : {}) }),
+        body: JSON.stringify({ action, ...(action === "START_SHIPPING" ? { estimatedDeliveryDate, shippingMethod } : {}), ...(action === "CONFIRM_PAYMENT" ? { paymentInfo } : {}) }),
       });
       const result = (await response.json()) as { error?: string } & ManageStatusResult;
       if (!response.ok) throw new Error(result.error || "No fue posible actualizar la solicitud");
@@ -172,6 +177,8 @@ export default function ManageStatusModal({
           ? "Solicitud reactivada"
         : step === "shipping-confirm"
           ? "Despacho iniciado"
+          : step === "payment-confirm"
+            ? "Pago confirmado"
           : step === "complete-confirm"
             ? "Solicitud finalizada"
               : step === "mandate-confirm"
@@ -189,6 +196,8 @@ export default function ManageStatusModal({
             ? "Asignar ejecutivo responsable"
             : step === "shipping-confirm"
               ? "Iniciar despacho"
+              : step === "payment-confirm"
+                ? "Confirmar pago por transferencia"
               : step === "mandate-confirm"
                 ? "Enviar poder / mandato"
               : step === "complete-confirm"
@@ -228,6 +237,11 @@ export default function ManageStatusModal({
             <SecondaryButton size="sm" onClick={() => setStep("choose")} disabled={isBusy}>Cancelar</SecondaryButton>
             <PrimaryButton size="sm" onClick={() => confirmTransition("START_SHIPPING")} disabled={isBusy || !estimatedDeliveryDate || !shippingMethod.trim() || !hasPaid} icon={isBusy ? Loader2 : undefined} className={isBusy ? "[&_svg]:animate-spin" : ""}>{isBusy ? "Actualizando..." : "Confirmar despacho"}</PrimaryButton>
           </div>
+        ) : step === "payment-confirm" ? (
+          <div className="flex justify-end gap-2">
+            <SecondaryButton size="sm" onClick={() => setStep("choose")} disabled={isBusy}>Cancelar</SecondaryButton>
+            <PrimaryButton size="sm" onClick={() => confirmTransition("CONFIRM_PAYMENT")} disabled={isBusy || !paymentInfo.trim() || !hasTransferReceipt} icon={isBusy ? Loader2 : undefined} className={isBusy ? "[&_svg]:animate-spin" : ""}>{isBusy ? "Confirmando..." : "Confirmar pago"}</PrimaryButton>
+          </div>
         ) : step === "mandate-confirm" ? (
           <div className="flex justify-end gap-2">
             <SecondaryButton size="sm" onClick={() => setStep("choose")} disabled={isBusy}>Cancelar</SecondaryButton>
@@ -264,7 +278,7 @@ export default function ManageStatusModal({
         <div className="flex flex-col items-center gap-3 py-6 text-center">
           <CheckCircle2 className="h-6 w-6 text-emerald-600" />
           <p className="text-sm font-semibold text-[var(--navy)]">
-            {step === "reject" ? "La solicitud fue marcada como rechazada." : step === "reactivate" || step === "reactivate-confirm" ? "La solicitud volvió a En gestión y el ejecutivo quedó asignado." : step === "mandate-confirm" ? "El mandato fue generado y enviado al cliente." : step === "shipping-confirm" ? "La solicitud pasó a En despacho." : step === "complete-confirm" ? "La solicitud fue marcada como finalizada." : "El ejecutivo fue asignado y queda registrado en el historial de la solicitud."}
+            {step === "reject" ? "La solicitud fue marcada como rechazada." : step === "reactivate" || step === "reactivate-confirm" ? "La solicitud volvió a En gestión y el ejecutivo quedó asignado." : step === "payment-confirm" ? "El pago por transferencia fue confirmado y la solicitud pasó a Pagado." : step === "mandate-confirm" ? "El mandato fue generado y enviado al cliente." : step === "shipping-confirm" ? "La solicitud pasó a En despacho." : step === "complete-confirm" ? "La solicitud fue marcada como finalizada." : "El ejecutivo fue asignado y queda registrado en el historial de la solicitud."}
           </p>
         </div>
       ) : step === "choose" ? (
@@ -280,7 +294,7 @@ export default function ManageStatusModal({
               <p className="mt-1 text-xs text-[var(--text-secondary)]">{currentStatus === "RECEIVED" ? "Asigna un ejecutivo responsable y deja la solicitud en gestión." : "Registra al ejecutivo responsable de esta solicitud y deja trazabilidad para futuras gestiones."}</p>
             </div>
           </button>}
-          {currentStatus === "ACCEPTED" && <button
+          {currentStatus === "PAID" && <button
             type="button"
             onClick={() => hasPaid && setStep("shipping-confirm")}
             disabled={!hasPaid}
@@ -288,6 +302,14 @@ export default function ManageStatusModal({
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-blue-50 text-[var(--blue)]"><UserCog className="h-4 w-4" /></div>
             <div><p className="text-sm font-bold text-[var(--navy)]">Iniciar despacho</p><p className="mt-1 text-xs text-[var(--text-secondary)]">{hasPaid ? "Confirma que el medicamento entra en proceso de despacho o envío." : "Bloqueado hasta que exista un pago confirmado."}</p></div>
+          </button>}
+          {currentStatus === "ACCEPTED" && <button
+            type="button"
+            onClick={() => setStep("payment-confirm")}
+            className="flex w-full items-start gap-3 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4 text-left transition hover:border-emerald-400 hover:bg-emerald-50"
+          >
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-emerald-700"><CheckCircle2 className="h-4 w-4" /></div>
+            <div><p className="text-sm font-bold text-emerald-800">Confirmar pago por transferencia</p><p className="mt-1 text-xs text-[var(--text-secondary)]">{hasTransferReceipt ? "Revisa el comprobante y registra los datos del pago." : "Primero solicita al cliente que adjunte el comprobante en la solicitud."}</p></div>
           </button>}
           {!["REJECTED", "CANCELLED", "COMPLETED"].includes(currentStatus) && <button
             type="button"
@@ -327,7 +349,7 @@ export default function ManageStatusModal({
               <p className="mt-1 text-xs text-[var(--text-secondary)]">Vuelve la solicitud a En gestión, asigna un ejecutivo y registra el motivo.</p>
             </div>
           </button>}
-          {!['RECEIVED', 'SOURCING', 'QUOTED', 'AWAITING_DECISION', 'ACCEPTED', 'SHIPPING', 'REJECTED'].includes(currentStatus) && <p className="rounded-xl border border-[var(--border)] bg-[var(--background)] p-4 text-sm text-[var(--text-secondary)]">No hay gestiones manuales disponibles para el estado actual.</p>}
+          {!['RECEIVED', 'SOURCING', 'QUOTED', 'AWAITING_DECISION', 'ACCEPTED', 'PAID', 'SHIPPING', 'REJECTED'].includes(currentStatus) && <p className="rounded-xl border border-[var(--border)] bg-[var(--background)] p-4 text-sm text-[var(--text-secondary)]">No hay gestiones manuales disponibles para el estado actual.</p>}
         </motion.div>
       ) : step === "assign-select" ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-3">
@@ -373,6 +395,19 @@ export default function ManageStatusModal({
               <p className="text-xs font-semibold text-rose-700">{error}</p>
             </div>
           )}
+        </motion.div>
+      ) : step === "payment-confirm" ? (
+        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">
+          <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+            <p className="font-bold">Confirma solo después de revisar el comprobante.</p>
+            <p className="mt-1">El estado cambiará a Pagado y luego se habilitará el despacho. El comprobante debe estar adjunto a la solicitud.</p>
+          </div>
+          <label className="block text-xs font-bold text-[var(--navy)]">
+            Información del pago <span className="text-rose-600">*</span>
+            <textarea value={paymentInfo} onChange={(event) => setPaymentInfo(event.target.value.slice(0, 2000))} className="field-input mt-2 min-h-28 w-full resize-y" placeholder="Banco, fecha, monto, número de operación y observaciones relevantes" />
+          </label>
+          {!hasTransferReceipt && <p className="text-xs font-semibold text-amber-700">Adjunta primero el comprobante de transferencia desde la tarjeta Documentos.</p>}
+          {stage === "error" && <div className="flex items-start gap-2 rounded-xl border border-rose-200 bg-rose-50 p-3"><AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0 text-rose-600" /><p className="text-xs font-semibold text-rose-700">{error}</p></div>}
         </motion.div>
       ) : step === "shipping-confirm" ? (
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-4">

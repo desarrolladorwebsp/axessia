@@ -76,6 +76,7 @@ async function loadAuthorizedRequest(requestNumber: string) {
           quoteNumber: true,
           status: true,
           total: true,
+          items: { select: { totalPrice: true } },
           validUntil: true,
           version: true,
         },

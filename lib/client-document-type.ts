@@ -1,4 +1,4 @@
-export const CLIENT_DOCUMENT_KINDS = ["MANDATE", "ID_FRONT", "ID_BACK", "OTHER"] as const;
+export const CLIENT_DOCUMENT_KINDS = ["MANDATE", "ID_FRONT", "ID_BACK", "TRANSFER_RECEIPT", "OTHER"] as const;
 
 export type ClientDocumentKind = (typeof CLIENT_DOCUMENT_KINDS)[number];
 
@@ -6,6 +6,7 @@ export const CLIENT_DOCUMENT_KIND_LABELS: Record<ClientDocumentKind, string> = {
   MANDATE: "Poder / mandato",
   ID_FRONT: "Cédula de identidad - parte delantera",
   ID_BACK: "Cédula de identidad - parte trasera",
+  TRANSFER_RECEIPT: "Comprobante de transferencia",
   OTHER: "Otros",
 };
 

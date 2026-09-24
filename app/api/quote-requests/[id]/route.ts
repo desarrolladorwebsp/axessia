@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { serializeDocumentMeta } from "@/lib/documents/file-service";
 import { readDevQuoteRequests, readDevQuotes, shouldUseJsonStorage, writeDevQuoteRequests } from "@/lib/dev-request-store";
 import { getInternalActor } from "@/lib/internal-access";
+import { quotePriceBreakdownFromItems } from "@/lib/quote-pricing";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -24,7 +25,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
         .filter((quote) => quote.requestId === id)
         .sort((a, b) => b.version - a.version);
 
-      return NextResponse.json({ ...request, clientDocuments: request.clientDocuments ?? [], generatedMandate: request.generatedMandate ?? null, internalNotes: request.internalNotes ?? [], events: request.events ?? [], quotes });
+      return NextResponse.json({ ...request, clientDocuments: request.clientDocuments ?? [], generatedMandate: request.generatedMandate ?? null, internalNotes: request.internalNotes ?? [], events: request.events ?? [], quotes: quotes.map((quote) => ({ ...quote, total: quotePriceBreakdownFromItems(quote.items).total })) });
     }
 
     const requestInclude = {
@@ -70,7 +71,7 @@ export async function GET(_request: NextRequest, { params }: RouteContext) {
       internalNotes: request.internalNotes,
       quotes: quotes.map((quote) => ({
         ...quote,
-        total: quote.total?.toString() ?? null,
+        total: quotePriceBreakdownFromItems(quote.items).total.toString(),
         validUntil: quote.validUntil?.toISOString() ?? null,
         createdAt: quote.createdAt.toISOString(),
         items: quote.items.map((item) => ({

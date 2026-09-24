@@ -65,7 +65,7 @@ h6 {
 
 .hero-home {
   position: relative;
-  background-image: url("/images/hero-section/bg-hero-xl.png");
+  background-image: url("/images/hero-section/bg-hero-xl-branded.png");
   background-position: center;
   background-size: cover;
 }
@@ -937,13 +937,14 @@ h6 {
   background: var(--brand-gradient);
   background-clip: text;
   color: transparent;
-  font-size: 1.65rem;
+  font-size: 2.05rem;
   font-weight: 800;
 }
 
 .tracking-stage-heading strong {
   color: var(--navy);
-  font-size: 0.75rem;
+  font-size: 1.05rem;
+  line-height: 1.2;
   text-transform: uppercase;
 }
 
@@ -967,14 +968,14 @@ h6 {
 
 .tracking-stage p {
   color: var(--text-secondary);
-  font-size: 0.78rem;
+  font-size: 0.98rem;
   line-height: 1.55;
 }
 
 .tracking-stage small {
   color: var(--navy);
   display: block;
-  font-size: 0.68rem;
+  font-size: 0.78rem;
   font-weight: 800;
   margin-top: 0.6rem;
 }
@@ -1153,7 +1154,7 @@ h6 {
 
 @media (max-width: 1279px) {
   .hero-home {
-    background-image: url("/images/hero-section/bg-hero-lg.png");
+    background-image: url("/images/hero-section/bg-hero-lg-branded.png");
   }
 
   .hero-home::before {
@@ -1165,7 +1166,7 @@ h6 {
 @media (max-width: 639px) {
   .hero-home {
     background-attachment: local;
-    background-image: url("/images/hero-section/bg-hero-movile.png");
+    background-image: url("/images/hero-section/bg-hero-movile-branded.png");
     background-position: center top;
     background-size: cover;
     background-repeat: no-repeat;
@@ -2478,7 +2479,35 @@ h6 {
 }
 
 .policy-page {
+  flex-direction: column;
   padding-bottom: 5.5rem;
+}
+
+.tracking-current-status {
+  align-items: flex-end;
+  background: linear-gradient(135deg, rgba(8, 127, 213, 0.1), rgba(91, 48, 214, 0.1));
+  border: 1px solid rgba(8, 127, 213, 0.2);
+  border-radius: 1rem;
+  display: flex;
+  flex-direction: column;
+  min-width: 12rem;
+  padding: 0.85rem 1.1rem;
+}
+
+.tracking-current-status span {
+  color: var(--text-secondary);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.tracking-current-status strong {
+  color: var(--navy);
+  font-family: var(--font-display), "Segoe UI", sans-serif;
+  font-size: 1.4rem;
+  line-height: 1.15;
+  margin-top: 0.2rem;
 }
 
 .policy-hero {

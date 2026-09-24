@@ -67,8 +67,9 @@ export default function CreateQuoteModal({
   useEffect(() => {
     if (!open) return;
     const seededItems: QuoteDraftItem[] = editingQuote
-      ? editingQuote.items.map((item) => ({
+        ? editingQuote.items.map((item) => ({
           clientId: item.id || newDraftClientId(),
+          productId: item.productId ?? "",
           productType: item.productType ?? productType,
           productName: item.productName,
           activeIngredient: item.activeIngredient ?? "",

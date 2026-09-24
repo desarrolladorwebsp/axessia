@@ -3,6 +3,7 @@ import path from "path";
 import { PDFDocument, PDFString, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
 import { getAxessiaLegalDetails } from "@/lib/axessia-legal";
 import { formatEstimatedShippingDays } from "@/lib/quote-items";
+import { quotePriceBreakdownFromItems } from "@/lib/quote-pricing";
 
 export type QuotePdfItem = {
   productType?: "MEDICATION" | "MEDICAL_DEVICE";
@@ -379,7 +380,8 @@ export async function generateQuotePdf(quote: QuotePdfData) {
     paymentCaptionLines.length * 11 +
     paymentPad;
   const totalBoxWidth = 220;
-  const totalBoxHeight = 46;
+  const priceBreakdown = quotePriceBreakdownFromItems(quote.items);
+  const totalBoxHeight = 72;
   const summaryRowHeight = Math.max(paymentBoxHeight, totalBoxHeight);
 
   ensureSpace(summaryRowHeight + 16);
@@ -424,20 +426,24 @@ export async function generateQuotePdf(quote: QuotePdfData) {
     height: totalBoxHeight,
     color: navyDark,
   });
-  page.drawText("Total cotización", {
+  page.drawText("Subtotal", {
     x: pageWidth - margin - totalBoxWidth + 16,
-    y: summaryTop - 18,
+    y: summaryTop - 16,
     size: 8,
     font: regular,
     color: rgb(0.75, 0.82, 0.9),
   });
-  page.drawText(money(quote.total), {
+  page.drawText(money(priceBreakdown.subtotal.toString()), {
     x: pageWidth - margin - totalBoxWidth + 16,
-    y: summaryTop - 36,
-    size: 14,
+    y: summaryTop - 28,
+    size: 9,
     font: bold,
     color: white,
   });
+  page.drawText("IVA (19%)", { x: pageWidth - margin - totalBoxWidth + 16, y: summaryTop - 42, size: 8, font: regular, color: rgb(0.75, 0.82, 0.9) });
+  page.drawText(money(priceBreakdown.iva.toString()), { x: pageWidth - margin - totalBoxWidth + 16, y: summaryTop - 54, size: 9, font: regular, color: white });
+  page.drawText("Total con IVA", { x: pageWidth - margin - totalBoxWidth + 124, y: summaryTop - 16, size: 8, font: regular, color: rgb(0.75, 0.82, 0.9) });
+  page.drawText(money(priceBreakdown.total.toString()), { x: pageWidth - margin - 16 - 76, y: summaryTop - 36, size: 13, font: bold, color: white });
   y = summaryTop - summaryRowHeight - 18;
 
   const notes = [
@@ -529,6 +535,62 @@ export async function generateQuotePdf(quote: QuotePdfData) {
       color: muted,
     });
   };
+
+  const requirementsPage = pdf.addPage([pageWidth, pageHeight]);
+  pages.push(requirementsPage);
+  let requirementsY = contentTop - 4;
+  requirementsPage.drawText("DOCUMENTACIÓN REQUERIDA", { x: margin, y: requirementsY, size: 14, font: bold, color: navy });
+  requirementsY -= 22;
+  requirementsPage.drawText("Para continuar con la gestión de tu cotización, prepara los siguientes antecedentes", { x: margin, y: requirementsY, size: 9, font: regular, color: muted });
+  requirementsY -= 26;
+
+  requirementsPage.drawRectangle({ x: margin, y: requirementsY - 82, width: contentWidth, height: 82, color: canvas, borderColor: border, borderWidth: 0.8 });
+  requirementsPage.drawText("DOCUMENTOS", { x: margin + 14, y: requirementsY - 18, size: 9, font: bold, color: blue });
+  const requiredDocuments = [
+    "Receta médica.",
+    "Carta poder simple notarial del paciente o del tutor.",
+    "Fotocopia del carné de identidad de quien firma el poder.",
+  ];
+  requiredDocuments.forEach((document, index) => {
+    requirementsPage.drawText(`- ${document}`, { x: margin + 14, y: requirementsY - 38 - index * 14, size: 9, font: regular, color: navy });
+  });
+  requirementsY -= 108;
+
+  requirementsPage.drawText("DATOS QUE DEBE CONTENER LA RECETA MÉDICA", { x: margin, y: requirementsY, size: 10, font: bold, color: blue });
+  requirementsY -= 17;
+  requirementsPage.drawText("La receta debe ser legible y contener, como mínimo, la siguiente información:", { x: margin, y: requirementsY, size: 8.5, font: regular, color: muted });
+  requirementsY -= 20;
+  const prescriptionRequirements = [
+    "Nombre y apellido del paciente.",
+    "RUT del paciente.",
+    "Nombre comercial del medicamento.",
+    "Principio activo del medicamento.",
+    "Presentación.",
+    "Dosis diaria prescrita.",
+    "Duración del tratamiento.",
+    "Cantidad total a importar.",
+    "Diagnóstico.",
+    "Nombre y apellido del médico.",
+    "RUT del médico.",
+    "Timbre del médico.",
+    "Fecha.",
+    "Firma de puño y letra del médico.",
+  ];
+  const columnGap = 24;
+  const columnWidth = (contentWidth - columnGap) / 2;
+  prescriptionRequirements.forEach((requirement, index) => {
+    const column = index < 7 ? 0 : 1;
+    const row = index < 7 ? index : index - 7;
+    const x = margin + column * (columnWidth + columnGap);
+    const yPosition = requirementsY - row * 22;
+    requirementsPage.drawText(`${index + 1}.`, { x, y: yPosition, size: 8.5, font: bold, color: navy });
+    const lines = wrap(requirement, regular, 8.5, columnWidth - 18);
+    lines.forEach((line, lineIndex) => requirementsPage.drawText(line, { x: x + 16, y: yPosition - lineIndex * 11, size: 8.5, font: regular, color: navy }));
+  });
+
+  requirementsPage.drawRectangle({ x: margin, y: 82, width: contentWidth, height: 42, color: rgb(240 / 255, 249 / 255, 255 / 255), borderColor: rgb(8 / 255, 127 / 255, 213 / 255), borderWidth: 0.7 });
+  requirementsPage.drawText("Importante", { x: margin + 12, y: 108, size: 8.5, font: bold, color: navy });
+  requirementsPage.drawText("La documentación debe corresponder al paciente y estar vigente al momento de iniciar la gestión.", { x: margin + 12, y: 94, size: 8, font: regular, color: muted });
 
   pages.forEach((target, index) => {
     drawHeader(target);

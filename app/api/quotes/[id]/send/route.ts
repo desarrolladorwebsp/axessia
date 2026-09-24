@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { readDevQuoteRequests, readDevQuotes, writeDevQuoteRequests, writeDevQuotes, shouldUseJsonStorage } from "@/lib/dev-request-store";
 import { sendQuoteReadyEmail } from "@/lib/services/email";
 import { getInternalActor } from "@/lib/internal-access";
+import { quotePriceBreakdownFromItems } from "@/lib/quote-pricing";
 
 type RouteContext = {
   params: Promise<{ id: string }>;
@@ -22,7 +23,7 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
       const quote = quotes[index];
 
       try {
-        await sendQuoteReadyEmail(quote.customer.email, quote.customer.name, quote.request.requestNumber || quote.quoteNumber, quote.quoteNumber, quote.total, quote.validUntil);
+        await sendQuoteReadyEmail(quote.customer.email, quote.customer.name, quote.request.requestNumber || quote.quoteNumber, quote.quoteNumber, quotePriceBreakdownFromItems(quote.items).total, quote.validUntil);
       } catch (emailError) {
         console.error("Error sending quote-ready email:", emailError);
         return NextResponse.json({ error: "No fue posible enviar la cotización al cliente. Intenta nuevamente." }, { status: 502 });
@@ -47,7 +48,7 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
 
     const quote = await prisma.quote.findUnique({
       where: { id },
-      include: { customer: { select: { email: true, name: true } }, request: { select: { id: true, requestNumber: true, status: true } } },
+      include: { customer: { select: { email: true, name: true } }, request: { select: { id: true, requestNumber: true, status: true } }, items: { select: { totalPrice: true } } },
     });
     if (!quote) return NextResponse.json({ error: "Cotización no encontrada" }, { status: 404 });
     if (quote.status !== "READY" || quote.request.status !== "QUOTED") return NextResponse.json({ error: "La cotización no está disponible para envío" }, { status: 409 });
@@ -58,7 +59,7 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
         quote.customer.name,
         quote.request.requestNumber || quote.quoteNumber || "",
         quote.quoteNumber || `Borrador v${quote.version}`,
-        quote.total?.toString() ?? null,
+        quotePriceBreakdownFromItems(quote.items).total.toString(),
         quote.validUntil?.toISOString() ?? null,
       );
     } catch (emailError) {

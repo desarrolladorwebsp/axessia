@@ -16,6 +16,7 @@ import {
   type BanchileSessionStatusCode,
 } from "@/lib/services/banchile";
 import { sendPaymentHelpRequestEmail } from "@/lib/services/email";
+import { quotePriceBreakdownFromItems } from "@/lib/quote-pricing";
 
 type PaymentRequest = {
   id: string;
@@ -31,6 +32,7 @@ type PaymentQuote = {
   version: number;
   status: string;
   total: Prisma.Decimal | number | string | null;
+  items?: Array<{ totalPrice: Prisma.Decimal | number | string | null }>;
 };
 
 function requireRequestNumber(request: PaymentRequest) {
@@ -41,21 +43,45 @@ function requireRequestNumber(request: PaymentRequest) {
 }
 
 function requireAcceptedContext(request: PaymentRequest, quote: PaymentQuote | null) {
-  if (!quote || quote.status !== "ACCEPTED" || request.status !== "ACCEPTED") {
+  if (!quote || quote.status !== "ACCEPTED" || !["ACCEPTED", "PAID"].includes(request.status)) {
     throw new DomainError("La cotización debe estar aceptada para continuar con el pago o el avance.", 409);
   }
   return quote;
+}
+
+async function recordPaymentResult(
+  tx: Prisma.TransactionClient,
+  input: { requestId: string; requestStatus: QuoteRequestStatus; paymentStatus: "PAID" | "FAILED" | "CANCELLED"; eventType: string; note: string | null },
+) {
+  const nextRequestStatus: QuoteRequestStatus = input.paymentStatus === "PAID" && input.requestStatus === "ACCEPTED" ? "PAID" : input.requestStatus;
+  if (nextRequestStatus !== input.requestStatus) {
+    await tx.quoteRequest.update({ where: { id: input.requestId }, data: { status: nextRequestStatus } });
+  }
+  await tx.quoteRequestEvent.create({
+    data: {
+      requestId: input.requestId,
+      status: nextRequestStatus,
+      eventType: input.eventType,
+      note: input.note,
+    },
+  });
+  return nextRequestStatus;
 }
 
 function quoteAmount(quote: PaymentQuote) {
   if (quote.total === null) {
     throw new DomainError("La cotización no tiene un total válido para pagar.", 409);
   }
-  const payable = payableAmountFromQuoteTotal(quote.total);
+  // Recalculate from the line items at payment time so legacy quotes created
+  // before VAT was persisted are also charged with IVA included.
+  const storedOrCalculatedTotal = quote.items?.length
+    ? quotePriceBreakdownFromItems(quote.items).total
+    : quote.total;
+  const payable = payableAmountFromQuoteTotal(storedOrCalculatedTotal);
   if (!payable) {
     throw new DomainError("Monto inválido para iniciar el pago.", 409);
   }
-  return { amount: quote.total, amountTotal: payable.amountTotal };
+  return { amount: storedOrCalculatedTotal, amountTotal: payable.amountTotal };
 }
 
 export async function advanceWithoutPayment(request: PaymentRequest, quote: PaymentQuote | null) {
@@ -138,20 +164,19 @@ export async function startPayment(input: {
                 failureReason: nextStatus === "FAILED" ? (session.status.message || "El pago fue rechazado por Banchile Pagos.") : null,
               },
             });
-            await tx.quoteRequestEvent.create({
-              data: {
-                requestId: input.request.id,
-                status: input.request.status,
-                eventType: nextStatus === "PAID" ? "PAYMENT_CONFIRMED" : "PAYMENT_FAILED",
-                note: nextStatus === "PAID" ? "Pago confirmado por Banchile Pagos." : session.status.message || "El pago fue rechazado por Banchile Pagos.",
-              },
+            const requestStatus = await recordPaymentResult(tx, {
+              requestId: input.request.id,
+              requestStatus: input.request.status,
+              paymentStatus: nextStatus,
+              eventType: nextStatus === "PAID" ? "PAYMENT_CONFIRMED" : "PAYMENT_FAILED",
+              note: nextStatus === "PAID" ? "Pago confirmado por Banchile Pagos." : session.status.message || "El pago fue rechazado por Banchile Pagos.",
             });
-            return next;
+            return { payment: next, requestStatus };
           });
           return {
-            status: input.request.status,
-            payment: serializePayment(resolved),
-            message: resolved.status === "PAID" ? "El pago ya fue confirmado." : "El pago anterior fue rechazado. Puedes iniciar un nuevo intento.",
+            status: resolved.requestStatus,
+            payment: serializePayment(resolved.payment),
+            message: resolved.payment.status === "PAID" ? "El pago ya fue confirmado." : "El pago anterior fue rechazado. Puedes iniciar un nuevo intento.",
           };
         }
       } catch {
@@ -300,24 +325,20 @@ export async function confirmPayment(input: {
         failureReason: nextStatus === "FAILED" ? (session.status.message || "El pago fue rechazado por Banchile Pagos.") : null,
       },
     });
-    await tx.quoteRequestEvent.create({
-      data: {
-        requestId: input.request.id,
-        status: input.request.status,
-        eventType: nextStatus === "PAID" ? "PAYMENT_CONFIRMED" : "PAYMENT_FAILED",
-        note:
-          nextStatus === "PAID"
-            ? `Pago confirmado por Banchile Pagos (${transaction?.authorization ?? payment.providerReference}).`
-            : session.status.message || "El pago fue rechazado por Banchile Pagos.",
-      },
+    const requestStatus = await recordPaymentResult(tx, {
+      requestId: input.request.id,
+      requestStatus: input.request.status,
+      paymentStatus: nextStatus,
+      eventType: nextStatus === "PAID" ? "PAYMENT_CONFIRMED" : "PAYMENT_FAILED",
+      note: nextStatus === "PAID" ? `Pago confirmado por Banchile Pagos (${transaction?.authorization ?? payment.providerReference}).` : session.status.message || "El pago fue rechazado por Banchile Pagos.",
     });
-    return next;
+    return { payment: next, requestStatus };
   });
 
   return {
-    status: input.request.status,
-    payment: serializePayment(updated),
-    message: updated.status === "PAID" ? "Pago confirmado correctamente." : "El pago fue rechazado. Puedes reintentar o solicitar ayuda a AXESSIA.",
+    status: updated.requestStatus,
+    payment: serializePayment(updated.payment),
+    message: updated.payment.status === "PAID" ? "Pago confirmado correctamente." : "El pago fue rechazado. Puedes reintentar o solicitar ayuda a AXESSIA.",
   };
 }
 
@@ -359,27 +380,23 @@ export async function completeSimulatedPayment(input: {
         failedAt: resolved.status === "FAILED" || resolved.status === "CANCELLED" ? now : null,
       },
     });
-    await tx.quoteRequestEvent.create({
-      data: {
-        requestId: input.request.id,
-        status: input.request.status,
-        eventType: resolved.eventType,
-        note:
-          resolved.status === "PAID"
-            ? `Pago confirmado por pasarela (${next.providerReference}).`
-            : resolved.failureReason,
-      },
+    const requestStatus = await recordPaymentResult(tx, {
+      requestId: input.request.id,
+      requestStatus: input.request.status,
+      paymentStatus: resolved.status,
+      eventType: resolved.eventType,
+      note: resolved.status === "PAID" ? `Pago confirmado por pasarela (${next.providerReference}).` : resolved.failureReason,
     });
-    return next;
+    return { payment: next, requestStatus };
   });
 
   return {
-    status: input.request.status,
-    payment: serializePayment(updated),
+    status: updated.requestStatus,
+    payment: serializePayment(updated.payment),
     message:
-      updated.status === "PAID"
+      updated.payment.status === "PAID"
         ? "Pago confirmado correctamente."
-        : updated.status === "CANCELLED"
+        : updated.payment.status === "CANCELLED"
           ? "Cancelaste el intento de pago. Puedes reintentar cuando quieras."
           : "El pago fue rechazado. Puedes reintentar o solicitar ayuda a AXESSIA.",
   };

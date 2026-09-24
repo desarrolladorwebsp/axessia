@@ -28,3 +28,17 @@ export type SuppliersResponse = {
     pages: number;
   };
 };
+
+export type SupplierQuote = {
+  id: string;
+  quoteNumber: string | null;
+  productName: string;
+  quantity: number;
+  unitPrice: string | null;
+  totalPrice: string | null;
+  customerName: string;
+  requestNumber: string | null;
+  quoteStatus: string;
+  saleStatus: "VENDIDA" | "ACEPTADA" | "PENDIENTE";
+  createdAt: string;
+};

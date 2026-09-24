@@ -17,8 +17,28 @@ import {
 
 type ProductSuggestion = {
   key: string;
-  source: "request" | "quote";
+  source: "request" | "quote" | "catalog";
   item: QuoteDraftItem;
+};
+
+type CatalogProduct = {
+  id: string;
+  productType: ProductType;
+  productName: string;
+  activeIngredient: string | null;
+  concentration: string | null;
+  pharmaceuticalForm: string | null;
+  brand: string | null;
+  model: string | null;
+  description: string | null;
+  presentation: string | null;
+  unitsPerPackage: number | null;
+  manufacturer: string | null;
+  originCountry: string | null;
+  supplierCountry: string | null;
+  supplierId: string | null;
+  sanitaryRegistry: string | null;
+  condition: "AVAILABLE" | "SPECIAL_IMPORT" | null;
 };
 
 function Field({ label, required, children }: { label: string; required?: boolean; children: React.ReactNode }) {
@@ -57,7 +77,9 @@ function productDetail(item: QuoteDraftItem, device: boolean) {
 }
 
 function sourceLabel(source: ProductSuggestion["source"]) {
-  return source === "request" ? "Solicitud" : "En esta cotización";
+  if (source === "request") return "Solicitud";
+  if (source === "quote") return "En esta cotización";
+  return "Catálogo";
 }
 
 function supplierName(item: QuoteDraftItem, suppliers: QuoteSupplierOption[]) {
@@ -96,12 +118,14 @@ export default function QuoteProductModal({
   const [query, setQuery] = useState("");
   const [error, setError] = useState("");
   const [catalogOpen, setCatalogOpen] = useState(false);
+  const [registeredProducts, setRegisteredProducts] = useState<CatalogProduct[]>([]);
 
   useEffect(() => {
     if (!open) return;
     setError("");
     setQuery("");
     setCatalogOpen(false);
+    setRegisteredProducts([]);
     if (editingItem) {
       setProductType(editingItem.productType);
       setDraft(editingItem);
@@ -110,6 +134,22 @@ export default function QuoteProductModal({
     setProductType(null);
     setDraft(emptyItem(defaultProductType));
   }, [open, editingItem, defaultProductType]);
+
+  useEffect(() => {
+    if (!open || !productType) return;
+    let cancelled = false;
+    const loadProducts = async () => {
+      try {
+        const response = await fetch(`/api/products?productType=${productType}`, { cache: "no-store" });
+        const result = await response.json() as { products?: CatalogProduct[] };
+        if (!cancelled) setRegisteredProducts(response.ok ? result.products ?? [] : []);
+      } catch {
+        if (!cancelled) setRegisteredProducts([]);
+      }
+    };
+    void loadProducts();
+    return () => { cancelled = true; };
+  }, [open, productType]);
 
   const device = isMedicalDevice(productType ?? defaultProductType);
 
@@ -135,8 +175,33 @@ export default function QuoteProductModal({
         item,
       }));
 
-    return [...requestItems, ...quoteItems];
-  }, [productType, medicalDevices, medications, existingItems, editingItem?.clientId]);
+    const savedProducts: ProductSuggestion[] = registeredProducts.map((product) => ({
+      key: `catalog-${product.id}`,
+      source: "catalog",
+      item: {
+        ...emptyItem(product.productType),
+        productId: product.id,
+        productType: product.productType,
+        productName: product.productName,
+        activeIngredient: product.activeIngredient ?? "",
+        concentration: product.concentration ?? "",
+        pharmaceuticalForm: product.pharmaceuticalForm ?? "",
+        brand: product.brand ?? "",
+        model: product.model ?? "",
+        description: product.description ?? "",
+        presentation: product.presentation ?? "",
+        unitsPerPackage: product.unitsPerPackage == null ? "" : String(product.unitsPerPackage),
+        supplierId: product.supplierId ?? "",
+        manufacturer: product.manufacturer ?? "",
+        originCountry: product.originCountry ?? "",
+        supplierCountry: product.supplierCountry ?? "",
+        sanitaryRegistry: product.sanitaryRegistry ?? "",
+        condition: product.condition ?? "",
+      },
+    }));
+
+    return [...savedProducts, ...requestItems, ...quoteItems];
+  }, [productType, medicalDevices, medications, existingItems, registeredProducts, editingItem?.clientId]);
 
   const searchResults = useMemo(() => {
     const normalizedQuery = query.trim().toLowerCase();
@@ -260,7 +325,7 @@ export default function QuoteProductModal({
                   <div className="px-3 py-4">
                     <p className="text-xs font-semibold text-[var(--navy)]">No encontramos este producto</p>
                     <p className="mt-1 text-[11px] text-[var(--text-secondary)]">
-                      Completa los datos abajo para agregarlo a esta cotización. Pronto podrás guardarlo también en el catálogo.
+                      Completa los datos abajo o registra primero el producto desde el menú Productos para conservar su costo interno.
                     </p>
                   </div>
                 )}
@@ -268,7 +333,7 @@ export default function QuoteProductModal({
                   <button
                     type="button"
                     disabled
-                    title="Próximamente podrás crear productos en el catálogo"
+                    title="Registra productos desde el menú Productos"
                     className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[var(--text-secondary)] opacity-60"
                   >
                     <Plus className="h-3.5 w-3.5" />
@@ -368,7 +433,7 @@ export default function QuoteProductModal({
           <button
             type="button"
             disabled
-            title="Próximamente podrás crear productos en el catálogo"
+            title="Registra productos desde el menú Productos"
             className="inline-flex items-center gap-1.5 text-[11px] font-bold text-[var(--text-secondary)] opacity-60"
           >
             <Plus className="h-3.5 w-3.5" />
@@ -380,7 +445,7 @@ export default function QuoteProductModal({
     >
       {catalog.length === 0 ? (
         <p className="py-6 text-center text-xs text-[var(--text-secondary)]">
-          Aún no hay productos de este tipo en la solicitud ni en esta cotización. Completa los datos en el formulario.
+          Aún no hay productos registrados de este tipo. Completa los datos en el formulario o créalo primero desde Productos.
         </p>
       ) : (
         <>

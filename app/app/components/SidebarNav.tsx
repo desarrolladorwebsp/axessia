@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { LayoutDashboard, FileText, Users, UserRound, Settings2, ReceiptText, Building2, BarChart3 } from "lucide-react";
+import { LayoutDashboard, FileText, Users, UserRound, Settings2, ReceiptText, Building2, BarChart3, Package } from "lucide-react";
 
 interface SidebarNavProps {
   onNavigate?: () => void;
@@ -39,6 +39,11 @@ const navItems = [
     label: "Usuarios",
     href: "/app/usuarios",
     icon: Users,
+  },
+  {
+    label: "Productos",
+    href: "/app/productos",
+    icon: Package,
   },
   {
     label: "Reportes",

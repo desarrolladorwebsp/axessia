@@ -16,7 +16,7 @@ type RouteContext = {
   params: Promise<{ id: string }>;
 };
 
-type StatusPayload = { action?: unknown; executiveId?: unknown; reason?: unknown; note?: unknown; fileName?: unknown; mimeType?: unknown; fileSize?: unknown; estimatedDeliveryDate?: unknown; shippingMethod?: unknown };
+type StatusPayload = { action?: unknown; executiveId?: unknown; reason?: unknown; note?: unknown; paymentInfo?: unknown; fileName?: unknown; mimeType?: unknown; fileSize?: unknown; estimatedDeliveryDate?: unknown; shippingMethod?: unknown };
 
 function invalid(message: string, status = 400) {
   return NextResponse.json({ error: message }, { status });
@@ -61,7 +61,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
   try {
     const payload = (await request.json()) as StatusPayload;
     const action = payload.action;
-    if (action !== "CONFIRM_MANAGEMENT" && action !== "REJECT" && action !== "REACTIVATE" && action !== "START_SHIPPING" && action !== "COMPLETE" && action !== "SEND_MANDATE" && action !== "ATTACH_SIGNED_MANDATE") return invalid("Acción no válida");
+    if (action !== "CONFIRM_MANAGEMENT" && action !== "REJECT" && action !== "REACTIVATE" && action !== "CONFIRM_PAYMENT" && action !== "START_SHIPPING" && action !== "COMPLETE" && action !== "SEND_MANDATE" && action !== "ATTACH_SIGNED_MANDATE") return invalid("Acción no válida");
 
     if (action === "CONFIRM_MANAGEMENT") {
       const executiveId = typeof payload.executiveId === "string" ? payload.executiveId.trim() : "";
@@ -222,9 +222,45 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ status: existing.status, updatedAt: updated.createdAt.toISOString() });
     }
 
+    if (action === "CONFIRM_PAYMENT") {
+      const paymentInfo = typeof payload.paymentInfo === "string" ? payload.paymentInfo.trim().slice(0, 2000) : "";
+      if (!paymentInfo) return invalid("Ingresa la información del pago para confirmarlo.");
+
+      const record = await prisma.quoteRequest.findUnique({
+        where: { id },
+        select: {
+          status: true,
+          payments: { where: { provider: "TRANSFER", status: { in: ["PENDING", "PROCESSING"] } }, orderBy: { createdAt: "desc" }, take: 1 },
+          clientDocuments: { where: { documentKind: "TRANSFER_RECEIPT", storageKey: { not: null } }, select: { id: true }, take: 1 },
+        },
+      });
+      if (!record) return invalid("Solicitud no encontrada", 404);
+      if (record.status !== "ACCEPTED") return invalid("La solicitud debe estar aceptada y pendiente de pago.", 409);
+      const payment = record.payments[0];
+      if (!payment) return invalid("No hay un pago por transferencia pendiente de confirmación.", 409);
+      if (!record.clientDocuments.length) return invalid("Adjunta primero el comprobante de transferencia en la solicitud.", 409);
+
+      const now = new Date();
+      const updated = await prisma.$transaction(async (transaction) => {
+        const nextPayment = await transaction.payment.update({ where: { id: payment.id }, data: { status: "PAID", paidAt: now, failedAt: null, failureReason: null } });
+        await transaction.quoteRequest.update({ where: { id }, data: { status: "PAID" } });
+        const event = await transaction.quoteRequestEvent.create({
+          data: {
+            requestId: id,
+            status: "PAID",
+            eventType: "PAYMENT_MANUALLY_CONFIRMED",
+            actorId: actor.id,
+            note: `Pago por transferencia confirmado. ${paymentInfo}`,
+          },
+        });
+        return { payment: nextPayment, event };
+      });
+      return NextResponse.json({ status: "PAID", updatedAt: updated.event.createdAt.toISOString(), note: updated.event });
+    }
+
     if (action === "START_SHIPPING" || action === "COMPLETE") {
       const transition = action === "START_SHIPPING"
-        ? { expected: "ACCEPTED", next: "SHIPPING", eventType: "SHIPPING_STARTED" }
+        ? { expected: "PAID", next: "SHIPPING", eventType: "SHIPPING_STARTED" }
         : { expected: "SHIPPING", next: "COMPLETED", eventType: "REQUEST_COMPLETED" };
       let note = typeof payload.note === "string" ? payload.note.trim().slice(0, 2000) : "";
 

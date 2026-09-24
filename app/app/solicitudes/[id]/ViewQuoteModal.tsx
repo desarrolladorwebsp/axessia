@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AlertTriangle, Download, Pencil, Send } from "lucide-react";
 import { formatEstimatedShippingDays } from "@/lib/quote-items";
+import { quotePriceBreakdownFromItems } from "@/lib/quote-pricing";
 import { isMedicalDevice, quoteConditionLabel, type ProductType } from "@/lib/product-type";
 import Modal from "../../components/Modal";
 import { PrimaryButton, SecondaryButton } from "../../components/Buttons";
@@ -10,6 +11,7 @@ import StatusBadge, { type StatusTone } from "../../components/StatusBadge";
 
 export type QuoteItemDetail = {
   id: string;
+  productId?: string | null;
   productType?: ProductType;
   productName: string;
   activeIngredient: string | null;
@@ -80,6 +82,7 @@ export default function ViewQuoteModal({
   const canSend = quote.status === "READY";
   const shippingEstimate = formatEstimatedShippingDays(quote.estimatedShippingDays);
   const isPaid = quote.payments?.some((payment) => payment.status === "PAID") ?? false;
+  const priceBreakdown = quotePriceBreakdownFromItems(quote.items);
 
   const sendQuote = async () => {
     if (isSending) return;
@@ -112,7 +115,7 @@ export default function ViewQuoteModal({
           </p>
           <div className="flex flex-wrap items-center gap-2">
             {sendError && <p className="text-xs font-semibold text-rose-600">{sendError}</p>}
-            <p className="text-sm font-extrabold text-[var(--navy)]">Total: {money(quote.total)}</p>
+            <p className="text-sm font-extrabold text-[var(--navy)]">Total con IVA: {money(priceBreakdown.total)}</p>
             {canEdit && (
               <>
                 <SecondaryButton size="sm" icon={Pencil} onClick={() => onEdit(quote)} disabled={isSending}>Editar</SecondaryButton>
@@ -138,6 +141,12 @@ export default function ViewQuoteModal({
         <StatusBadge label={quoteStatusLabels[quote.status] || quote.status} tone={quoteStatusTones[quote.status]} />
         {quote.status === "ACCEPTED" && <span className={`rounded-full px-2.5 py-1 text-[10px] font-extrabold ${isPaid ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-800"}`}>{isPaid ? "PAGADA" : "PAGO PENDIENTE"}</span>}
         <span className="text-xs text-[var(--text-secondary)]">{quote.items.length} producto{quote.items.length === 1 ? "" : "s"}</span>
+      </div>
+
+      <div className="mb-5 ml-auto max-w-sm space-y-2 rounded-xl border border-[var(--border)] bg-[var(--background)] p-4 text-sm">
+        <div className="flex justify-between gap-4 text-[var(--text-secondary)]"><span>Subtotal</span><strong>{money(priceBreakdown.subtotal)}</strong></div>
+        <div className="flex justify-between gap-4 text-[var(--text-secondary)]"><span>IVA (19%)</span><strong>{money(priceBreakdown.iva)}</strong></div>
+        <div className="flex justify-between gap-4 border-t border-[var(--border)] pt-2 font-extrabold text-[var(--navy)]"><span>Total con IVA</span><strong>{money(priceBreakdown.total)}</strong></div>
       </div>
 
       <div className="space-y-3">

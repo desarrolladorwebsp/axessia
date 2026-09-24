@@ -87,7 +87,6 @@ export default function AboutPage() {
             </h2>
             <div className="about-purpose-rule" aria-hidden="true" />
             <div className="about-purpose-description">
-              <p>AXESSIA Health Solutions nace de una convicción simple: <strong>el acceso a la salud no debería depender de dónde vives ni de cuánto puedes pagar.</strong></p>
               <p>Sabemos lo que significa que un tratamiento exista, pero se sienta lejano por precio, por trámites o porque simplemente no llega a Chile.</p>
               <p>Por eso existimos: para acortar esa distancia y ponernos, de verdad, <strong>del lado del paciente.</strong></p>
             </div>

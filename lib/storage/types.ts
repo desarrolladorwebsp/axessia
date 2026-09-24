@@ -4,6 +4,7 @@ export const DOCUMENT_STORAGE_TYPES = [
   "mandate-documents",
   "generated-mandates",
   "avatars",
+  "chat-images",
 ] as const;
 
 export type DocumentStorageType = (typeof DOCUMENT_STORAGE_TYPES)[number];

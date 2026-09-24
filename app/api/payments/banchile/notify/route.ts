@@ -50,10 +50,14 @@ export async function POST(request: NextRequest) {
           failureReason: nextStatus === "FAILED" ? (session.status.message || "El pago fue rechazado por Banchile Pagos.") : null,
         },
       });
+      const nextRequestStatus = nextStatus === "PAID" && quoteRequest.status === "ACCEPTED" ? "PAID" : quoteRequest.status;
+      if (nextRequestStatus !== quoteRequest.status) {
+        await tx.quoteRequest.update({ where: { id: payment.requestId }, data: { status: nextRequestStatus } });
+      }
       await tx.quoteRequestEvent.create({
         data: {
           requestId: payment.requestId,
-          status: quoteRequest.status,
+          status: nextRequestStatus,
           eventType: nextStatus === "PAID" ? "PAYMENT_CONFIRMED" : "PAYMENT_FAILED",
           note:
             nextStatus === "PAID"

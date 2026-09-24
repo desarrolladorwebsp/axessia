@@ -8,6 +8,7 @@ import { OPEN_REQUEST_STATUSES } from "@/lib/customer-status";
 import { paginationMeta, PORTAL_PAGE_SIZE, parsePage } from "@/lib/portal/pagination";
 import { iso, serializeMoney } from "@/lib/portal/serialize";
 import { formatEstimatedShippingDays } from "@/lib/quote-items";
+import { quotePriceBreakdownFromItems } from "@/lib/quote-pricing";
 import { REQUEST_STATUS_DESCRIPTIONS, REQUEST_STATUS_LABELS } from "@/lib/request-status";
 import { parsePortalProfileUpdate, profileUpdateChanged, type PortalProfileUpdateInput } from "@/lib/portal/profile";
 import { scopedToCustomer, ownedResourceWhere } from "@/lib/portal/scope";
@@ -119,6 +120,7 @@ export async function getPortalDashboard(customerId: string) {
         validUntil: true,
         requestId: true,
         request: { select: { requestNumber: true, status: true } },
+        items: { select: { totalPrice: true } },
       },
     }),
   ]);
@@ -143,7 +145,7 @@ export async function getPortalDashboard(customerId: string) {
       id: quote.id,
       quoteNumber: quote.quoteNumber,
       version: quote.version,
-      total: serializeMoney(quote.total),
+      total: quotePriceBreakdownFromItems(quote.items).total.toString(),
       validUntil: iso(quote.validUntil),
       requestId: quote.requestId,
       requestNumber: quote.request.requestNumber,
@@ -176,7 +178,7 @@ export async function listPortalRequests(customerId: string, pageValue?: string 
           where: { status: { in: [...CUSTOMER_VISIBLE_QUOTE_STATUSES] } },
           orderBy: { version: "desc" },
           take: 1,
-          select: { quoteNumber: true, status: true, total: true, validUntil: true },
+          select: { quoteNumber: true, status: true, total: true, validUntil: true, items: { select: { totalPrice: true } } },
         },
       },
     }),
@@ -198,7 +200,7 @@ export async function listPortalRequests(customerId: string, pageValue?: string 
         ? {
             quoteNumber: request.quotes[0].quoteNumber,
             status: quoteExpired(request.quotes[0].status, request.quotes[0].validUntil) ? "EXPIRED" : request.quotes[0].status,
-            total: serializeMoney(request.quotes[0].total),
+            total: quotePriceBreakdownFromItems(request.quotes[0].items).total.toString(),
           }
         : null,
     })),
@@ -293,7 +295,7 @@ export async function getPortalRequestDetail(customerId: string, requestId: stri
   const acceptedQuote = record.quotes.find((quote) => quote.status === "ACCEPTED") ?? null;
   const shippingStarted = record.events.find((event) => event.eventType === "SHIPPING_STARTED") ?? null;
   const shippingCompleted = record.events.find((event) => event.eventType === "REQUEST_COMPLETED") ?? null;
-  const shippingAvailable = record.status === "SHIPPING" || record.status === "COMPLETED" || Boolean(acceptedQuote?.estimatedShippingDays);
+  const shippingAvailable = record.status === "PAID" || record.status === "SHIPPING" || record.status === "COMPLETED" || Boolean(acceptedQuote?.estimatedShippingDays);
   const hasPaid = record.payments.some((payment) => payment.status === "PAID");
   const currentQuoteRecord =
     record.quotes.find((quote) => quote.status === "SENT")
@@ -302,14 +304,15 @@ export async function getPortalRequestDetail(customerId: string, requestId: stri
     ?? null;
   const currentExpired = currentQuoteRecord ? quoteExpired(currentQuoteRecord.status, currentQuoteRecord.validUntil) : false;
   const canDecide = Boolean(currentQuoteRecord && record.status === "AWAITING_DECISION" && currentQuoteRecord.status === "SENT" && !currentExpired);
-  const canContinueAfterAccept = Boolean(currentQuoteRecord && record.status === "ACCEPTED" && currentQuoteRecord.status === "ACCEPTED");
+  const canContinueAfterAccept = Boolean(currentQuoteRecord && ["ACCEPTED", "PAID"].includes(record.status) && currentQuoteRecord.status === "ACCEPTED");
 
   const quotes = record.quotes.map((quote) => ({
     id: quote.id,
     quoteNumber: quote.quoteNumber,
     version: quote.version,
     status: quoteExpired(quote.status, quote.validUntil) ? "EXPIRED" : quote.status,
-    total: serializeMoney(quote.total),
+    priceBreakdown: quotePriceBreakdownFromItems(quote.items),
+    total: quotePriceBreakdownFromItems(quote.items).total.toString(),
     validUntil: iso(quote.validUntil),
     estimatedShippingDays: quote.estimatedShippingDays,
     sentAt: iso(quote.sentAt),
@@ -488,7 +491,7 @@ export async function listPortalQuotes(customerId: string, pageValue?: string | 
         requestNumber: quote.request.requestNumber,
         requestStatus: quote.request.status,
         canDecide: quote.request.status === "AWAITING_DECISION" && quote.status === "SENT" && !expired,
-        canPay: quote.request.status === "ACCEPTED" && quote.status === "ACCEPTED",
+        canPay: ["ACCEPTED", "PAID"].includes(quote.request.status) && quote.status === "ACCEPTED",
       };
     }),
     pagination: paginationMeta(total, page),
@@ -572,14 +575,15 @@ export async function getPortalQuoteDetail(customerId: string, quoteId: string) 
   const latestPayment = quote.payments[0] ? serializePayment(quote.payments[0]) : null;
   const hasPaid = quote.payments.some((payment) => payment.status === "PAID");
   const canDecide = quote.request.status === "AWAITING_DECISION" && quote.status === "SENT" && !expired;
-  const canContinueAfterAccept = quote.request.status === "ACCEPTED" && quote.status === "ACCEPTED";
+  const canContinueAfterAccept = ["ACCEPTED", "PAID"].includes(quote.request.status) && quote.status === "ACCEPTED";
 
   return {
     id: quote.id,
     quoteNumber: quote.quoteNumber,
     version: quote.version,
     status: displayStatus,
-    total: serializeMoney(quote.total),
+    priceBreakdown: quotePriceBreakdownFromItems(quote.items),
+    total: quotePriceBreakdownFromItems(quote.items).total.toString(),
     validUntil: iso(quote.validUntil),
     estimatedShippingDays: quote.estimatedShippingDays,
     sentAt: iso(quote.sentAt),

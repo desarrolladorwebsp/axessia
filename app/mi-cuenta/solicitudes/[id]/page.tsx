@@ -11,6 +11,7 @@ import { REQUEST_STATUS_LABELS } from "@/lib/request-status";
 import { isCustomerOriginatedEvent, requestEventLabel } from "@/lib/request-events";
 import { isMedicalDevice, productTypeLabel } from "@/lib/product-type";
 import { RequestQuoteSection } from "@/components/portal/RequestQuoteSection";
+import { ChatPanel } from "@/components/ChatPanel";
 
 export default async function PortalRequestDetailPage({
   params,
@@ -157,6 +158,8 @@ export default async function PortalRequestDetailPage({
         quote={detail.currentQuote}
         confirmOnReturn={payment === "return"}
       />
+
+      <ChatPanel requestId={detail.id} />
 
       <section className="card-surface rounded-2xl p-5 sm:p-6">
         <h2 className="font-display text-lg font-extrabold text-[var(--navy)]">Historial de avances</h2>
