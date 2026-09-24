@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { FileText, Loader2, Upload } from "lucide-react";
+import { ChevronDown, FileText, Loader2, Upload } from "lucide-react";
 import {
   CLIENT_DOCUMENT_KIND_LABELS,
   CLIENT_DOCUMENT_KINDS,
@@ -23,16 +23,18 @@ type ClientDocument = {
 };
 
 type GeneratedMandate = { fileName: string; sentAt: string | null } | null;
+type Prescription = { id: string; fileName: string; mimeType: string; fileSize: number; hasStoredFile?: boolean } | null;
 
 const fieldClassName = "h-10 w-full rounded-xl border border-[var(--border)] bg-white px-3 text-xs font-semibold text-[var(--navy)] outline-none transition focus:border-[var(--blue)] focus:ring-4 focus:ring-[var(--blue)]/10";
 
-export default function ClientDocumentsCard({ requestId, initialDocuments, generatedMandate }: { requestId: string; initialDocuments: ClientDocument[]; generatedMandate: GeneratedMandate }) {
+export default function ClientDocumentsCard({ requestId, initialDocuments, generatedMandate, prescription, prescriptionTitle }: { requestId: string; initialDocuments: ClientDocument[]; generatedMandate: GeneratedMandate; prescription: Prescription; prescriptionTitle: string }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [documents, setDocuments] = useState(initialDocuments);
   const [documentKind, setDocumentKind] = useState<ClientDocumentKind | "">("");
   const [customLabel, setCustomLabel] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
+  const [isExpanded, setIsExpanded] = useState(true);
 
   const uploadDocument = async (file: File) => {
     if (isSaving) return;
@@ -87,12 +89,17 @@ export default function ClientDocumentsCard({ requestId, initialDocuments, gener
     fileInputRef.current?.click();
   };
 
+  const totalDocuments = documents.length + (prescription ? 1 : 0);
+
   return (
-    <section className="mt-5 rounded-2xl border border-[var(--border)] bg-white p-5 shadow-[0_10px_28px_rgba(7,30,65,0.04)]">
-      <div className="mb-5 flex items-center gap-3">
-        <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-[var(--blue)]/10 text-[var(--blue)]"><FileText className="h-4 w-4" /></div>
-        <div><h2 className="font-display text-base font-extrabold text-[var(--navy)]">Documentos</h2><p className="mt-0.5 text-xs text-[var(--text-secondary)]">Archivos asociados al cliente y a esta solicitud</p></div>
-      </div>
+    <section className="rounded-2xl border border-[var(--border)] bg-white p-5 shadow-[0_10px_28px_rgba(7,30,65,0.04)]">
+      <button type="button" onClick={() => setIsExpanded((current) => !current)} aria-expanded={isExpanded} aria-controls="request-documents" className="flex w-full items-center gap-3 text-left">
+        <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[var(--blue)]/10 text-[var(--blue)]"><FileText className="h-4 w-4" /></span>
+        <span className="min-w-0 flex-1"><span className="block font-display text-base font-extrabold text-[var(--navy)]">Documentos</span><span className="mt-0.5 block truncate text-xs text-[var(--text-secondary)]">{totalDocuments} archivo{totalDocuments === 1 ? "" : "s"} asociado{totalDocuments === 1 ? "" : "s"} a esta solicitud</span></span>
+        <ChevronDown className={`h-5 w-5 shrink-0 text-[var(--purple)] transition-transform ${isExpanded ? "rotate-180" : ""}`} />
+      </button>
+      {isExpanded ? <div id="request-documents" className="mt-5">
+        {prescription ? <div className="mb-4 flex flex-col gap-4 rounded-xl border border-[var(--purple)]/20 bg-violet-50/40 p-4 sm:flex-row sm:items-center sm:justify-between"><div className="flex min-w-0 items-center gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-white text-[var(--purple)]"><FileText className="h-5 w-5" /></span><span className="min-w-0"><span className="block text-[10px] font-bold uppercase tracking-[0.12em] text-[var(--purple)]">{prescriptionTitle}</span><strong className="mt-1 block truncate text-sm text-[var(--navy)]">{prescription.fileName}</strong><span className="mt-1 block text-xs text-[var(--text-secondary)]">{prescription.mimeType} · {(prescription.fileSize / 1024).toFixed(1)} KB</span></span></div>{prescription.hasStoredFile ? <a href={storedFileApiPath("prescriptions", prescription.id)} target="_blank" rel="noreferrer" className="shrink-0 rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-center text-xs font-bold text-[var(--blue)] transition hover:border-[var(--blue)]">Ver {prescriptionTitle.toLowerCase()}</a> : <span className="shrink-0 rounded-lg border border-[var(--border)] bg-white px-3 py-2 text-center text-xs font-bold text-[var(--text-secondary)]">Archivo no disponible</span>}</div> : <div className="mb-4 rounded-xl border border-dashed border-[var(--border)] bg-[var(--background)] p-4 text-sm text-[var(--text-secondary)]">No se adjuntó {prescriptionTitle.toLowerCase()}.</div>}
       <div className="space-y-3 rounded-xl border border-dashed border-[var(--border)] bg-[var(--background)] p-4">
         <label className="block">
           <span className="mb-1.5 block text-xs font-bold text-[var(--navy)]">Tipo de documento</span>
@@ -160,6 +167,7 @@ export default function ClientDocumentsCard({ requestId, initialDocuments, gener
           ))}
         </ul>
       )}
+      </div> : null}
     </section>
   );
 }
