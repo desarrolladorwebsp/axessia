@@ -6,5 +6,6 @@ deployment:
     - /usr/bin/rsync -a --exclude='.git/' --exclude='.cpanel.yml' --exclude='.env' --exclude='.env.*' --exclude='node_modules/' --exclude='.next/' --exclude='storage/' --exclude='tmp/' ./ $DEPLOYPATH
     - cd $DEPLOYPATH && npm ci --no-audit --no-fund
     - cd $DEPLOYPATH && npx prisma generate
+    - export CPANEL_BUILD=1
     - cd $DEPLOYPATH && npm run build
     - cd $DEPLOYPATH && /bin/mkdir -p tmp && /usr/bin/touch tmp/restart.txt
