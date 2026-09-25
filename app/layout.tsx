@@ -6,6 +6,11 @@ import { getAxessiaLegalDetails } from "@/lib/axessia-legal";
 import { getPortalCustomer } from "@/lib/customer-access";
 import "./globals.css";
 
+// The shared layout reads the current customer's session from cookies. Rendering
+// this tree dynamically prevents Next.js from attempting database-backed static
+// generation during the production build.
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "AXESSIA | Tecnología y salud con confianza",
   description:
