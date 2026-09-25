@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { PDFDocument, PDFString, StandardFonts, rgb, type PDFFont, type PDFImage, type PDFPage } from "pdf-lib";
+import { getAppBaseUrl } from "@/lib/app-url";
 import { getAxessiaLegalDetails } from "@/lib/axessia-legal";
 import { formatEstimatedShippingDays } from "@/lib/quote-items";
 import { quotePriceBreakdownFromItems } from "@/lib/quote-pricing";
@@ -130,15 +131,8 @@ function joinParts(parts: Array<string | null | undefined>) {
   return parts.map((part) => part?.trim()).filter((part): part is string => Boolean(part)).join(" · ");
 }
 
-function getPublicAppUrl() {
-  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
-  const raw = configuredUrl || "www.axessia.cl";
-  const withProtocol = /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
-  return withProtocol.replace(/\/$/, "");
-}
-
 function getTermsAndConditionsUrl() {
-  return `${getPublicAppUrl()}/politicas`;
+  return `${getAppBaseUrl()}/politicas`;
 }
 
 function addUriLink(page: PDFPage, url: string, x: number, y: number, width: number, height: number) {

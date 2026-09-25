@@ -44,6 +44,11 @@ describe("URL base de la aplicación", () => {
     assert.equal(getAppBaseUrl(), "https://axessia.cl");
   });
 
+  it("reemplaza una URL pública antigua de Vercel por el dominio canónico", () => {
+    setEnv({ NEXT_PUBLIC_APP_URL: "https://axessia.vercel.app" });
+    assert.equal(getAppBaseUrl(), "https://axessia.cl");
+  });
+
   it("usa el dominio de producción del proyecto cuando está disponible", () => {
     setEnv({
       VERCEL_ENV: "production",

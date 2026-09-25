@@ -44,6 +44,9 @@ export default function TrackingRutGate({ requestNumber, onVerified }: Props) {
       };
 
       sessionStorage.setItem(trackingStorageKey(canonicalRequestNumber), token);
+      if (trackingStorageKey(requestNumber) !== trackingStorageKey(canonicalRequestNumber)) {
+        sessionStorage.setItem(trackingStorageKey(requestNumber), token);
+      }
       await onVerified();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "No fue posible validar la solicitud.");
