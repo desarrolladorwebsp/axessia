@@ -48,7 +48,7 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
 
     const quote = await prisma.quote.findUnique({
       where: { id },
-      include: { customer: { select: { email: true, name: true } }, request: { select: { id: true, requestNumber: true, status: true } }, items: { select: { totalPrice: true } } },
+      include: { customer: { select: { email: true, name: true } }, request: { select: { id: true, requestNumber: true, status: true, origin: true } }, items: { select: { totalPrice: true } } },
     });
     if (!quote) return NextResponse.json({ error: "Cotización no encontrada" }, { status: 404 });
     if (quote.status !== "READY" || quote.request.status !== "QUOTED") return NextResponse.json({ error: "La cotización no está disponible para envío" }, { status: 409 });
@@ -57,7 +57,7 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
       await sendQuoteReadyEmail(
         quote.customer.email,
         quote.customer.name,
-        quote.request.requestNumber || quote.quoteNumber || "",
+        quote.request.origin === "DIRECT_QUOTE" ? quote.quoteNumber || "" : quote.request.requestNumber || quote.quoteNumber || "",
         quote.quoteNumber || `Borrador v${quote.version}`,
         quotePriceBreakdownFromItems(quote.items).total.toString(),
         quote.validUntil?.toISOString() ?? null,

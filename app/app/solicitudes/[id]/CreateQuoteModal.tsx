@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AlertTriangle, CheckCircle2, Loader2, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import Modal from "../../components/Modal";
@@ -33,16 +33,21 @@ export default function CreateQuoteModal({
   medicalDevices,
   editingQuote = null,
   onCreated,
+  onSent,
+  directCustomer,
 }: {
   open: boolean;
   onClose: () => void;
-  requestId: string;
+  requestId?: string;
   customerName: string;
   productType: ProductType;
   medications: MedicationSeed[];
   medicalDevices: DeviceSeed[];
   editingQuote?: QuoteDetail | null;
   onCreated: (quote: QuoteDetail) => void;
+  /** Se invoca cuando la cotización ya fue enviada al cliente, para refrescar el estado de la solicitud. */
+  onSent?: () => void;
+  directCustomer?: { name: string; email: string; rut: string; phone: string; city: string };
 }) {
   const isEditing = Boolean(editingQuote);
   const deviceQuote = isMedicalDevice(productType);
@@ -53,7 +58,7 @@ export default function CreateQuoteModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false);
-  const initialSnapshot = useRef("");
+  const [initialSnapshot, setInitialSnapshot] = useState("");
 
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [confirmStage, setConfirmStage] = useState<"idle" | "creating" | "sending" | "sent" | "create-error" | "send-error">("idle");
@@ -64,8 +69,15 @@ export default function CreateQuoteModal({
   const [productModalOpen, setProductModalOpen] = useState(false);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (!open) return;
+  // El borrador se siembra durante el render de apertura (no en un efecto) para que
+  // el primer pintado ya muestre los productos de la solicitud en vez de una tabla vacía.
+  const [wasOpen, setWasOpen] = useState(false);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) seedDraft();
+  }
+
+  function seedDraft() {
     const seededItems: QuoteDraftItem[] = editingQuote
         ? editingQuote.items.map((item) => ({
           clientId: item.id || newDraftClientId(),
@@ -96,7 +108,6 @@ export default function CreateQuoteModal({
         : medications.map((medication) => emptyItem("MEDICATION", medication));
     const defaultValidUntil = editingQuote?.validUntil ? editingQuote.validUntil.slice(0, 10) : defaultQuoteValidUntilDate();
     const defaultShippingDays = editingQuote?.estimatedShippingDays != null ? String(editingQuote.estimatedShippingDays) : "";
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- resets the draft form each time the modal opens
     setValidUntil(defaultValidUntil);
     setEstimatedShippingDays(defaultShippingDays);
     setNotes("");
@@ -109,8 +120,8 @@ export default function CreateQuoteModal({
     setCreatedQuote(null);
     setProductModalOpen(false);
     setEditingItemId(null);
-    initialSnapshot.current = JSON.stringify({ items: seededItems, validUntil: defaultValidUntil, estimatedShippingDays: defaultShippingDays, notes: "" });
-  }, [open, productType, medications, medicalDevices, editingQuote, deviceQuote]);
+    setInitialSnapshot(JSON.stringify({ items: seededItems, validUntil: defaultValidUntil, estimatedShippingDays: defaultShippingDays, notes: "" }));
+  }
 
   useEffect(() => {
     if (!open) return;
@@ -129,8 +140,8 @@ export default function CreateQuoteModal({
 
   const removeItem = (clientId: string) => setItems((current) => current.filter((item) => item.clientId !== clientId));
 
-  const { subtotal, iva, total } = quoteMoneyBreakdown(items);
-  const isDirty = () => JSON.stringify({ items, validUntil, estimatedShippingDays, notes }) !== initialSnapshot.current;
+  const { subtotal: net, iva, total } = quoteMoneyBreakdown(items);
+  const isDirty = () => JSON.stringify({ items, validUntil, estimatedShippingDays, notes }) !== initialSnapshot;
   const isBusy = confirmStage === "creating" || confirmStage === "sending";
   const editingItem = items.find((item) => item.clientId === editingItemId) ?? null;
 
@@ -169,7 +180,7 @@ export default function CreateQuoteModal({
       method: isEditing ? "PATCH" : "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        requestId,
+        ...(requestId ? { requestId } : { directCustomer }),
         validUntil: validUntil || null,
         estimatedShippingDays: estimatedShippingDays === "" ? null : Number(estimatedShippingDays),
         asDraft,
@@ -276,6 +287,9 @@ export default function CreateQuoteModal({
     try {
       await sendCreatedQuote(quote.id);
       setConfirmStage("sent");
+      // El envío cambia el estado de la cotización a SENT y el de la solicitud a
+      // AWAITING_DECISION, así que la vista debe releer la solicitud ya enviada.
+      onSent?.();
     } catch (sendError) {
       setConfirmStage("send-error");
       setConfirmError(sendError instanceof Error ? sendError.message : "No fue posible enviar la cotización al cliente");
@@ -372,7 +386,7 @@ export default function CreateQuoteModal({
       </AnimatePresence>
 
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <p className="text-xs font-semibold text-[var(--text-secondary)]">{items.length} producto{items.length === 1 ? "" : "s"} en esta cotización</p>
+        <p className="text-xs font-semibold text-[var(--text-secondary)]">{`${items.length} ${items.length === 1 ? "producto" : "productos"} en esta cotización`}</p>
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex flex-col gap-1 text-xs font-bold text-[var(--navy)] md:flex-row md:items-center md:gap-2">
             Tiempo estimado de envío
@@ -516,8 +530,8 @@ export default function CreateQuoteModal({
         </label>
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--background)] p-4">
           <div className="flex items-center justify-between text-xs text-[var(--text-secondary)]">
-            <span>Total</span>
-            <span className="font-semibold text-[var(--navy)]">{formatClp(subtotal)}</span>
+            <span>Neto</span>
+            <span className="font-semibold text-[var(--navy)]">{formatClp(net)}</span>
           </div>
           <div className="mt-2 flex items-center justify-between text-xs text-[var(--text-secondary)]">
             <span>IVA (19%)</span>

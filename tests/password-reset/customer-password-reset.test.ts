@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { generateResetToken, hashPassword, hashResetToken, isValidResetTokenFormat, validatePassword } from "../../lib/password";
 import { buildPasswordResetUrl } from "../../lib/services/password-reset";
 import { renderCustomerPasswordResetEmail } from "../../lib/services/customer-notification-emails";

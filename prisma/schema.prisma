@@ -65,6 +65,7 @@ enum InternalInvitationStatus {
 enum QuoteRequestOrigin {
   WEB
   EJECUTIVO
+  DIRECT_QUOTE
 }
 
 enum ProductType {

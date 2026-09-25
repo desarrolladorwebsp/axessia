@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { evaluateQuoteDecision } from "../../lib/quote-decision";
 import { CUSTOMER_VISIBLE_QUOTE_STATUSES, isCustomerVisibleQuoteStatus } from "../../lib/quote-status";
 

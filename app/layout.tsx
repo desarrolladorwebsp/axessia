@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Navbar from "@/components/Navbar";
 import { QuoteModalProvider } from "@/components/QuoteModal";
 import Footer from "@/components/Footer";
+import { getAppBaseUrl } from "@/lib/app-url";
 import { getAxessiaLegalDetails } from "@/lib/axessia-legal";
 import { getPortalCustomer } from "@/lib/customer-access";
 import "./globals.css";
@@ -12,6 +13,7 @@ import "./globals.css";
 export const dynamic = "force-dynamic";
 
 export const metadata: Metadata = {
+  metadataBase: new URL(getAppBaseUrl()),
   title: "AXESSIA | Tecnología y salud con confianza",
   description:
     "AXESSIA conecta tecnología, salud y cercanía para ofrecer soluciones digitales seguras y humanas.",

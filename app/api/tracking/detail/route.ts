@@ -23,6 +23,7 @@ export async function GET(request: NextRequest) {
       id: true,
       requestNumber: true,
       requesterName: true,
+      origin: true,
       status: true,
       createdAt: true,
       updatedAt: true,
@@ -142,7 +143,7 @@ export async function GET(request: NextRequest) {
     : null;
 
   return NextResponse.json({
-    requestNumber: record.requestNumber,
+    requestNumber: record.origin === "DIRECT_QUOTE" && quote?.quoteNumber ? quote.quoteNumber : record.requestNumber,
     requesterName: record.requesterName,
     status: record.status,
     createdAt: record.createdAt.toISOString(),

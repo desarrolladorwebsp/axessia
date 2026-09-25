@@ -4,9 +4,10 @@ import { useState } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import SidebarNav from "./SidebarNav";
+import SidebarUser, { type SidebarUserInfo } from "./SidebarUser";
 import { Menu, X } from "lucide-react";
 
-export default function Sidebar() {
+export default function Sidebar({ user }: { user: SidebarUserInfo }) {
   const [isOpen, setIsOpen] = useState(false);
 
   const sidebarVariants = {
@@ -47,14 +48,8 @@ export default function Sidebar() {
         </nav>
 
         <div className="border-t border-white/10 p-4">
-          <div className="mb-4 flex items-center gap-3 rounded-xl bg-white/5 p-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[var(--cyan)] text-sm font-bold">AH</div>
-            <div className="min-w-0">
-              <p className="truncate text-sm font-semibold">Administrador</p>
-              <p className="truncate text-xs text-white/50">Equipo AXESSIA</p>
-            </div>
-          </div>
-          <p className="text-[11px] text-white/35">© 2026 AXESSIA</p>
+          <SidebarUser user={user} />
+          <p className="mt-4 text-[11px] text-white/35">© 2026 AXESSIA</p>
         </div>
       </aside>
 
@@ -63,8 +58,8 @@ export default function Sidebar() {
         <Image
           src="/images/logo-axessia-white.png"
           alt="Logo AXESSIA"
-          width={100}
-          height={33}
+          width={96}
+          height={32}
           priority
           className="h-8 w-auto"
         />
@@ -113,8 +108,9 @@ export default function Sidebar() {
                 <SidebarNav onNavigate={() => setIsOpen(false)} />
               </nav>
 
-              <div className="p-4 border-t border-[var(--navy-dark)] text-xs text-white opacity-60">
-                <p>© 2026 AXESSIA</p>
+              <div className="border-t border-[var(--navy-dark)] p-4">
+                <SidebarUser user={user} onNavigate={() => setIsOpen(false)} />
+                <p className="mt-4 text-[11px] text-white/40">© 2026 AXESSIA</p>
               </div>
             </motion.aside>
           </>

@@ -47,6 +47,17 @@ export function buildRequestNumberVariants(rawValue: string): string[] {
   return [...variants];
 }
 
+export function isQuoteTrackingIdentifier(rawValue: string): boolean {
+  return /^c\d+$/.test(normalizeTrackingIdentifier(rawValue));
+}
+
+export function buildQuoteNumberVariants(rawValue: string): string[] {
+  const normalized = normalizeTrackingIdentifier(rawValue);
+  if (!/^c\d+$/.test(normalized)) return [];
+  const suffix = normalized.slice(1);
+  return [...new Set([rawValue.trim(), rawValue.trim().toUpperCase(), `C-${suffix}`, `C${suffix}`])];
+}
+
 export function trackingStorageKey(requestNumber: string): string {
   return `axessia-tracking-${normalizeTrackingRequestNumberForComparison(requestNumber)}`;
 }

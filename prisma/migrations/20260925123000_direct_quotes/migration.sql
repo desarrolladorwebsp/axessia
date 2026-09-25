@@ -1,0 +1,3 @@
+-- AlterEnum
+ALTER TABLE `QuoteRequest`
+    MODIFY `origin` ENUM('WEB', 'EJECUTIVO', 'DIRECT_QUOTE') NOT NULL DEFAULT 'WEB';

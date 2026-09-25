@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { summarizeRequestProducts } from "../../lib/portal/request-summary";
 
 describe("resumen de productos en el listado del portal", () => {

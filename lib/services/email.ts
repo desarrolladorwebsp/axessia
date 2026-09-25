@@ -1,4 +1,5 @@
 import { Resend } from "resend";
+import { getAppBaseUrl } from "@/lib/app-url";
 import {
   renderCustomerPasswordResetEmail,
   renderMandateEmail,
@@ -18,14 +19,7 @@ export const EMAIL_NOTIFICATION = process.env.EMAIL_NOTIFICATION || process.env.
 export const ADMIN_EMAIL = EMAIL_NOTIFICATION;
 
 export function getAppUrl(): string {
-  const configuredUrl = process.env.NEXT_PUBLIC_APP_URL?.trim();
-
-  if (!configuredUrl) {
-    return "https://axessia.cl";
-  }
-
-  const urlWithProtocol = /^https?:\/\//i.test(configuredUrl) ? configuredUrl : `https://${configuredUrl}`;
-  return urlWithProtocol.replace(/\/$/, "");
+  return getAppBaseUrl();
 }
 
 // Initialize Resend only if API key is available

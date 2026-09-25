@@ -11,6 +11,7 @@ import {
 } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowRight, FileCheck2, FileUp, LoaderCircle, Minus, Plus, X } from "lucide-react";
 
 import { isValidRut } from "@/lib/customer-validation";
@@ -101,6 +102,7 @@ export function QuoteModalProvider({
   children: ReactNode;
   accountContact?: QuoteAccountContact | null;
 }) {
+  const router = useRouter();
   const [isOpen, setIsOpen] = useState(false);
   const [values, setValues] = useState<FormValues>(initialValues);
   const contactLocked = Boolean(accountContact);
@@ -128,16 +130,14 @@ export function QuoteModalProvider({
   }, [isOpen]);
 
   const openQuoteModal = () => {
-    if (accountContact) {
-      setValues((current) => ({
-        ...current,
-        name: accountContact.name,
-        phone: accountContact.phone,
-        email: accountContact.email,
-        rut: accountContact.rut,
-        city: accountContact.city,
-      }));
-    }
+    setValues(accountContact ? { ...initialValues, ...accountContact } : initialValues);
+    setProductType("MEDICATION");
+    setProducts([emptyMedication(1)]);
+    setDevices([emptyDevice(1)]);
+    setDifferentPatient(false);
+    setConsents({ policies: false, data: false });
+    setErrors({});
+    setFileError("");
     setIsOpen(true);
     setIsSubmitted(false);
     setCurrentStep(1);
@@ -146,7 +146,10 @@ export function QuoteModalProvider({
   };
 
   const closeQuoteModal = () => {
-    if (!isSubmitting) setIsOpen(false);
+    if (isSubmitting) return;
+    setIsOpen(false);
+    // El listado del portal se renderiza en el servidor: sin refresh la nueva solicitud no aparece.
+    if (isSubmitted) router.refresh();
   };
 
   const updateValue = (field: keyof FormValues, value: string) => {

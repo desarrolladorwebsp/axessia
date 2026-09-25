@@ -166,6 +166,9 @@ export async function decideQuote(input: {
         },
       });
     }
+  }, {
+    maxWait: 5_000,
+    timeout: 15_000,
   });
 
   const quoteNumber = input.quote.quoteNumber || `C-${input.quote.version}`;

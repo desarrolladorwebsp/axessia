@@ -51,10 +51,11 @@ export async function GET(request: NextRequest) {
 
     if (shouldUseJsonStorage()) {
       const records = await readDevQuoteRequests();
-      const recordsInPeriod = hasPeriod ? records.filter((record) => {
+      const requestRecords = records.filter((record) => record.origin !== "DIRECT_QUOTE");
+      const recordsInPeriod = hasPeriod ? requestRecords.filter((record) => {
         const createdAt = new Date(record.createdAt);
         return createdAt >= monthStart && createdAt < monthEnd;
-      }) : records;
+      }) : requestRecords;
       const filtered = status
         ? recordsInPeriod.filter((record) => record.status === status)
         : recordsInPeriod;
@@ -117,9 +118,9 @@ export async function GET(request: NextRequest) {
     }
 
     const where: Prisma.QuoteRequestWhereInput = {
+      origin: origin ?? { not: "DIRECT_QUOTE" },
       ...(hasPeriod ? { createdAt: { gte: monthStart, lt: monthEnd } } : {}),
       ...(status ? { status } : {}),
-      ...(origin ? { origin } : {}),
       ...(executive === "unassigned" ? { assignedExecutiveId: null } : {}),
       ...(query
         ? {

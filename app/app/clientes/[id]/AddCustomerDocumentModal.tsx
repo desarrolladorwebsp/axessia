@@ -49,15 +49,26 @@ export default function AddCustomerDocumentModal({
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState("");
 
+  // Reinicia el formulario cuando el modal pasa de cerrado a abierto,
+  // ajustando el estado durante el render (en vez de en un efecto) para
+  // evitar un ciclo extra de renderizado, según react-hooks/set-state-in-effect.
+  const [wasOpen, setWasOpen] = useState(open);
+  if (open !== wasOpen) {
+    setWasOpen(open);
+    if (open) {
+      setRequestId(requests[0]?.id ?? "");
+      setProductName("");
+      setFile(null);
+      setError("");
+      setIsSaving(false);
+    }
+  }
+
+  // Limpiar el input de archivo sí requiere un efecto: es una mutación
+  // imperativa del DOM, no una actualización de estado de React.
   useEffect(() => {
-    if (!open) return;
-    setRequestId(requests[0]?.id ?? "");
-    setProductName("");
-    setFile(null);
-    setError("");
-    setIsSaving(false);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-  }, [open, requests]);
+    if (open && fileInputRef.current) fileInputRef.current.value = "";
+  }, [open]);
 
   const submit = async () => {
     if (isSaving) return;

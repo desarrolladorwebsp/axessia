@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect -- El estado de carga se reinicia al abrir un proveedor distinto. */
+
 import Modal from "../components/Modal";
 import { PrimaryButton, SecondaryButton } from "../components/Buttons";
 import type { SupplierQuote, SupplierRecord } from "./types";

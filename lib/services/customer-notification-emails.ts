@@ -1,3 +1,5 @@
+import { AXESSIA_LOCALE, AXESSIA_TIME_ZONE } from "@/lib/datetime";
+
 function escapeHtml(text: string) {
   const map: Record<string, string> = {
     "&": "&amp;",
@@ -11,10 +13,10 @@ function escapeHtml(text: string) {
 
 export function formatQuoteValidityLabel(validUntil: Date | null) {
   if (!validUntil) return "Sin fecha límite informada";
-  return validUntil.toLocaleString("es-CL", {
+  return validUntil.toLocaleString(AXESSIA_LOCALE, {
     dateStyle: "long",
     timeStyle: "short",
-    timeZone: "America/Santiago",
+    timeZone: AXESSIA_TIME_ZONE,
   });
 }
 
@@ -211,9 +213,9 @@ export function renderQuoteReadyEmail(input: {
   trackingUrl: string;
   faqUrl: string;
 }) {
-  const totalLabel = input.total !== null ? `$${Number(input.total).toLocaleString("es-CL")}` : "Por confirmar";
+  const totalLabel = input.total !== null ? `$${Number(input.total).toLocaleString(AXESSIA_LOCALE)}` : "Por confirmar";
   const validUntilLabel = input.validUntil
-    ? new Date(input.validUntil).toLocaleDateString("es-CL", { dateStyle: "long" })
+    ? new Date(input.validUntil).toLocaleDateString(AXESSIA_LOCALE, { dateStyle: "long", timeZone: AXESSIA_TIME_ZONE })
     : "Sin fecha límite";
 
   return renderCustomerEmail({
@@ -229,7 +231,7 @@ export function renderQuoteReadyEmail(input: {
       {
         label: "Total estimado",
         value: totalLabel,
-        hint: `Vigente hasta: ${validUntilLabel}`,
+        hint: `IVA incluido · Vigente hasta: ${validUntilLabel}`,
       },
     ],
     ctaLabel: "Ver mi cotización",

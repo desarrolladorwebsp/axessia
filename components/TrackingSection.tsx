@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { ArrowRight, Check, LockKeyhole, Search } from "lucide-react";
 
 import { isValidRut } from "@/lib/customer-validation";
+import { formatDateTimeCl } from "@/lib/datetime";
 import { trackingStorageKey } from "@/lib/tracking-normalization";
 
 const stages = [
@@ -15,7 +16,7 @@ const stages = [
 ];
 const labels: Record<string, string> = { RECEIVED: "Recibida", SOURCING: "En gestión", QUOTED: "Cotizada", AWAITING_DECISION: "Esperando respuesta", ACCEPTED: "Aceptada", PAID: "Pagado", SHIPPING: "En despacho", REJECTED: "Rechazada", CANCELLED: "Cancelada", COMPLETED: "Finalizada" };
 type Summary = { requestNumber: string; status: string; createdAt: string; updatedAt: string; productType?: "MEDICATION" | "MEDICAL_DEVICE"; medications: Array<{ commercialName: string; concentration: string; tabletQuantity: number | null }>; medicalDevices?: Array<{ name: string; brand: string | null; model: string | null; quantity: number | null }>; hasQuote: boolean };
-const date = (value: string) => new Intl.DateTimeFormat("es-CL", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
+const date = (value: string) => formatDateTimeCl(value);
 const sanitizeRequestNumberInput = (value: string) => value.replace(/[^a-zA-Z0-9-]/g, "");
 const sanitizeRutInput = (value: string) => value.replace(/[^0-9kK.\-\s]/g, "");
 
@@ -30,27 +31,31 @@ export default function TrackingSection() {
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError(""); setSummary(null);
-    if (!requestNumber.trim()) return setError("Ingresa tu número de solicitud.");
+    if (!requestNumber.trim()) return setError("Ingresa tu número de solicitud o cotización.");
     if (!needsRut) return setNeedsRut(true);
     if (!rut.trim()) return setError("Ingresa el RUT asociado a la solicitud.");
     if (!isValidRut(rut)) return setError("Ingresa un RUT válido.");
     setLoading(true);
     try {
       const verify = await fetch("/api/tracking", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ requestNumber, rut }) });
-      if (!verify.ok) throw new Error("No pudimos validar esos datos. Revisa tu número de solicitud y RUT.");
+      if (!verify.ok) throw new Error("No pudimos validar esos datos. Revisa tu número de solicitud o cotización y RUT.");
       const { token, requestNumber: canonicalRequestNumber } = await verify.json() as { token: string; requestNumber: string };
       const detail = await fetch(`/api/tracking/detail?token=${encodeURIComponent(token)}`);
       if (!detail.ok) throw new Error("No fue posible cargar el seguimiento.");
-      setSummary(await detail.json() as Summary);
+      const detailData = await detail.json() as Summary;
+      setSummary(detailData);
       sessionStorage.setItem(trackingStorageKey(canonicalRequestNumber), token);
+      if (detailData.requestNumber !== canonicalRequestNumber) {
+        sessionStorage.setItem(trackingStorageKey(detailData.requestNumber), token);
+      }
     } catch (cause) { setError(cause instanceof Error ? cause.message : "No fue posible consultar la solicitud."); }
     finally { setLoading(false); }
   };
 
   return <section className="tracking-section" id="seguimiento" aria-labelledby="tracking-title">
     <div className="tracking-hero"><motion.div className="tracking-copy" initial={{ opacity: 0, y: 22 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, amount: 0.2 }}>
-      <p className="eyebrow">Seguimiento inteligente</p><h2 id="tracking-title">Tu solicitud,<br /><span className="gradient-text">siempre a la vista.</span></h2><p className="tracking-subtitle">Consulta su estado con tu ID.</p><div className="tracking-rule brand-gradient" /><p className="tracking-description">Ingresa tu ID AXESSIA. Para proteger tu información, también necesitaremos el RUT asociado.</p>
-      <form className="tracking-form" onSubmit={submit} noValidate><label htmlFor="tracking-id">Número de solicitud AXESSIA</label><div className="tracking-input-row"><input id="tracking-id" value={requestNumber} onChange={(event) => { setRequestNumber(sanitizeRequestNumberInput(event.target.value)); setNeedsRut(false); setSummary(null); setError(""); }} placeholder="Ej: S-100001" autoComplete="off" />{!needsRut && <button type="submit"><Search size={18} aria-hidden="true" /><span>Consultar estado</span></button>}</div>
+      <p className="eyebrow">Seguimiento inteligente</p><h2 id="tracking-title">Tu solicitud,<br /><span className="gradient-text">siempre a la vista.</span></h2><p className="tracking-subtitle">Consulta su estado con tu ID.</p><div className="tracking-rule brand-gradient" /><p className="tracking-description">Ingresa el número de tu solicitud o cotización AXESSIA. Para proteger tu información, también necesitaremos el RUT asociado.</p>
+      <form className="tracking-form" onSubmit={submit} noValidate><label htmlFor="tracking-id">Número de solicitud o cotización</label><div className="tracking-input-row"><input id="tracking-id" value={requestNumber} onChange={(event) => { setRequestNumber(sanitizeRequestNumberInput(event.target.value)); setNeedsRut(false); setSummary(null); setError(""); }} placeholder="Ej: S-100001 o C-10001" autoComplete="off" />{!needsRut && <button type="submit"><Search size={18} aria-hidden="true" /><span>Consultar estado</span></button>}</div>
         {needsRut && <motion.div className="mt-3" initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}><label htmlFor="tracking-rut">RUT asociado a la solicitud</label><div className="tracking-input-row"><input id="tracking-rut" value={rut} onChange={(event) => { setRut(sanitizeRutInput(event.target.value)); setError(""); }} placeholder="Ej: 12.345.678-9" autoComplete="off" /><button type="submit" disabled={loading}><Search size={18} aria-hidden="true" /><span>{loading ? "Validando..." : "Ver solicitud"}</span></button></div></motion.div>}
         {error && <motion.p className="mt-3 text-sm font-semibold text-red-700" role="alert" initial={{ opacity: 0 }} animate={{ opacity: 1 }}>{error}</motion.p>}
       </form><p className="tracking-security"><LockKeyhole size={16} aria-hidden="true" /> Información 100% segura y confidencial.</p>

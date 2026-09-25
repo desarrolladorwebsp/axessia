@@ -13,9 +13,11 @@ import StatusBadge, { type StatusTone } from "../components/StatusBadge";
 import Avatar from "../components/Avatar";
 import { FilterBar, SearchField, FilterSelect } from "../components/FilterBar";
 import Pagination from "../components/Pagination";
+import CreateQuoteModal from "../solicitudes/[id]/CreateQuoteModal";
+import DirectQuoteCustomerModal, { type DirectQuoteCustomer } from "./DirectQuoteCustomerModal";
 
 type QuoteStatus = "DRAFT" | "READY" | "SENT" | "ACCEPTED" | "REJECTED" | "EXPIRED" | "VOIDED";
-type Quote = { id: string; quoteNumber: string | null; version: number; status: QuoteStatus; total: string | null; validUntil: string | null; createdAt: string; sentAt: string | null; payments?: Array<{ status: string; paidAt?: string | null }>; request: { id: string; requestNumber: string | null; requesterName: string; requesterEmail: string; customer: { name: string; email: string } | null }; items: Array<{ productName: string; quantity: number }> };
+type Quote = { id: string; quoteNumber: string | null; version: number; status: QuoteStatus; total: string | null; validUntil: string | null; createdAt: string; sentAt: string | null; payments?: Array<{ status: string; paidAt?: string | null }>; request: { id: string; requestNumber: string | null; origin: string; requesterName: string; requesterEmail: string; customer: { name: string; email: string } | null }; items: Array<{ productName: string; quantity: number }> };
 type QuotesResponse = {
   quotes: Quote[];
   summary?: {
@@ -43,6 +45,9 @@ export default function QuotesPage() {
   const [page, setPage] = useState(1);
   const [query, setQuery] = useState("");
   const [status, setStatus] = useState("Todos");
+  const [showCustomerForm, setShowCustomerForm] = useState(false);
+  const [directCustomer, setDirectCustomer] = useState<DirectQuoteCustomer | null>(null);
+  const [refreshVersion, setRefreshVersion] = useState(0);
 
   useEffect(() => {
     const fetchQuotes = async () => {
@@ -65,7 +70,7 @@ export default function QuotesPage() {
       }
     };
     fetchQuotes();
-  }, [page, query, status]);
+  }, [page, query, status, refreshVersion]);
 
   const summary = data?.summary ?? {
     totalQuotes: 0,
@@ -99,8 +104,30 @@ export default function QuotesPage() {
         icon={FileText}
         eyebrow="Gestión comercial"
         title="Cotizaciones"
-        description="Propuestas comerciales vinculadas a solicitudes"
-        actions={<PrimaryButton href="/app/solicitudes" icon={Plus}>Nueva cotización</PrimaryButton>}
+        description="Propuestas comerciales originadas desde solicitudes o creadas directamente"
+        actions={<PrimaryButton onClick={() => setShowCustomerForm(true)} icon={Plus}>Nueva cotización</PrimaryButton>}
+      />
+
+      <DirectQuoteCustomerModal
+        open={showCustomerForm}
+        onClose={() => setShowCustomerForm(false)}
+        onContinue={(customer) => {
+          setShowCustomerForm(false);
+          setDirectCustomer(customer);
+        }}
+      />
+      <CreateQuoteModal
+        open={Boolean(directCustomer)}
+        onClose={() => setDirectCustomer(null)}
+        customerName={directCustomer?.name ?? "Cliente"}
+        productType="MEDICATION"
+        medications={[]}
+        medicalDevices={[]}
+        directCustomer={directCustomer ?? undefined}
+        onCreated={() => {
+          setPage(1);
+          setRefreshVersion((current) => current + 1);
+        }}
       />
 
       {isLoading && <SkeletonTable rows={6} />}
@@ -172,7 +199,7 @@ function QuoteRow({ quote, index, onOpen }: { quote: Quote; index: number; onOpe
         </div>
       </td>
       <td className="px-3 py-4">
-        <p className="text-xs font-bold text-[var(--navy)]">{quote.request.requestNumber || "Sin solicitud"}</p>
+        <p className="text-xs font-bold text-[var(--navy)]">{quote.request.origin === "DIRECT_QUOTE" ? "Cotización directa" : quote.request.requestNumber || "Sin solicitud"}</p>
         <p className="mt-1 text-[10px] text-[var(--text-secondary)]">{quote.items.length} ítem{quote.items.length === 1 ? "" : "s"}</p>
       </td>
       <td className="px-3 py-4 text-[10px] text-[var(--text-secondary)]">
@@ -209,7 +236,7 @@ function MobileQuoteCard({ quote, index, onOpen }: { quote: Quote; index: number
         <StatusBadge label={statusLabels[quote.status]} tone={statusTones[quote.status]} />
       </div>
       <div className="mt-3 flex justify-between text-[10px] text-[var(--text-secondary)]">
-        <span>{quote.request.requestNumber || "Sin solicitud"}</span>
+        <span>{quote.request.origin === "DIRECT_QUOTE" ? "Cotización directa" : quote.request.requestNumber || "Sin solicitud"}</span>
         <span>{quote.total ? `$${Number(quote.total).toLocaleString("es-CL")}` : "Pendiente"}</span>
       </div>
       {quote.status === "ACCEPTED" && <p className={`mt-2 text-[10px] font-extrabold ${quote.payments?.some((payment) => payment.status === "PAID") ? "text-emerald-700" : "text-amber-800"}`}>{quote.payments?.some((payment) => payment.status === "PAID") ? "PAGADA" : "PAGO PENDIENTE"}</p>}

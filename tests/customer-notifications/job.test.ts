@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { QUOTE_REMINDER_PERIOD_MS } from "../../lib/customer-notifications/keys";
 import { dispatchRequestCompletedNotice, notifyRequestCompleted, runCustomerNotificationJob } from "../../lib/customer-notifications/job";
 import type { EmailDeliveryResult, QuoteReminderEmailInput, RequestCompletedEmailInput } from "../../lib/customer-notifications/types";

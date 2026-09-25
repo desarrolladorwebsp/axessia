@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect -- Las cargas remotas se reinician al cambiar filtros o montar la vista. */
+
 import { useEffect, useState } from "react";
 import { Package, Pill, Plus, RefreshCw, Search, Trash2 } from "lucide-react";
 import PageHeader from "../components/PageHeader";

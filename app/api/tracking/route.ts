@@ -5,6 +5,8 @@ import { prisma } from "@/lib/prisma";
 import { createTrackingToken } from "@/lib/public-tracking";
 import {
   buildRequestNumberVariants,
+  buildQuoteNumberVariants,
+  isQuoteTrackingIdentifier,
   matchesTrackingCredentials,
   normalizeRutForComparison,
   normalizeTrackingIdentifier,
@@ -20,7 +22,7 @@ function invalidResponse() {
   return NextResponse.json(
     {
       error:
-        "No pudimos validar esos datos. Revisa tu número de solicitud y RUT.",
+        "No pudimos validar esos datos. Revisa tu número de solicitud o cotización y el RUT.",
     },
     { status: 404 },
   );
@@ -46,6 +48,19 @@ async function findTrackingRecord(
   requestNumberNormalized: string,
   rutNormalized: string,
 ) {
+  if (isQuoteTrackingIdentifier(rawRequestNumber)) {
+    const quotes = await prisma.quote.findMany({
+      where: { quoteNumber: { in: buildQuoteNumberVariants(rawRequestNumber) } },
+      select: {
+        request: { select: { requestNumber: true, requesterRut: true } },
+      },
+    });
+    const matched = quotes
+      .map((quote) => quote.request)
+      .find((candidate) => normalizeRutForComparison(candidate.requesterRut) === rutNormalized);
+    if (matched?.requestNumber) return matched;
+  }
+
   const variants = buildRequestNumberVariants(rawRequestNumber);
 
   if (variants.length > 0) {
@@ -90,8 +105,11 @@ export async function POST(request: Request) {
       typeof payload.requestNumber === "string" ? payload.requestNumber.trim() : "";
     const rawRut = typeof payload.rut === "string" ? payload.rut.trim() : "";
 
+    const rawIdentifierNormalized = normalizeTrackingIdentifier(rawRequestNumber);
     const requestNumberNormalized = rawRequestNumber
-      ? normalizeTrackingRequestNumberForComparison(normalizeTrackingIdentifier(rawRequestNumber))
+      ? (isQuoteTrackingIdentifier(rawIdentifierNormalized)
+          ? rawIdentifierNormalized
+          : normalizeTrackingRequestNumberForComparison(rawIdentifierNormalized))
       : "";
     const rutNormalized = rawRut ? normalizeRutForComparison(rawRut) : "";
 

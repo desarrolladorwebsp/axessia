@@ -5,6 +5,7 @@ import { motion } from "framer-motion";
 import { BadgeCheck, CalendarRange, ClipboardList, FileCheck2, LayoutDashboard, PackageCheck, ReceiptText, Truck, XCircle } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import PageHeader from "../components/PageHeader";
+import InternalAlerts from "./InternalAlerts";
 
 interface QuoteRequestSummary {
   id: string;
@@ -247,6 +248,8 @@ export default function DashboardPage() {
           {error}
         </p>
       )}
+
+      <InternalAlerts />
 
       {isLoading ? (
         <DashboardKpiSkeleton />

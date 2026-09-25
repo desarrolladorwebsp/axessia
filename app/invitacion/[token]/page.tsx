@@ -33,41 +33,59 @@ function DatabaseUnavailableView({ token }: { token: string }) {
   );
 }
 
+type InvitationView =
+  | { kind: "database-unavailable" }
+  | { kind: "invalid"; message: string }
+  | { kind: "form"; invitation: { email: string; rut: string; role: "EJECUTIVO" | "ADMINISTRADOR" } };
+
 export default async function InvitationPage({ params }: { params: Promise<{ token: string }> }) {
   let token = "desconocido";
+  let view: InvitationView;
 
+  // La resolución de la vista (consultas y validaciones) se separa de la
+  // construcción del JSX: el bloque try/catch solo calcula qué vista mostrar,
+  // y el JSX se construye después, fuera del try/catch, según
+  // react-hooks/error-boundaries.
   try {
     const resolvedParams = await params;
     token = resolvedParams.token;
 
     if (!process.env.DATABASE_URL) {
-      return <DatabaseUnavailableView token={token} />;
-    }
-
-    const invitation = await prisma.internalUserInvitation.findUnique({
-      where: { token },
-      select: { id: true, email: true, rut: true, role: true, status: true, expiresAt: true },
-    });
-
-    if (!invitation) {
-      return <InvalidInvitationView message="La invitación no existe, fue eliminada o no es válida." />;
-    }
-
-    if (invitation.status !== "PENDING") {
-      return <InvalidInvitationView message="Esta invitación ya fue utilizada o ya no está activa." />;
-    }
-
-    if (new Date(invitation.expiresAt).getTime() < Date.now()) {
-      await prisma.internalUserInvitation.update({
-        where: { id: invitation.id },
-        data: { status: "EXPIRED" },
+      view = { kind: "database-unavailable" };
+    } else {
+      const invitation = await prisma.internalUserInvitation.findUnique({
+        where: { token },
+        select: { id: true, email: true, rut: true, role: true, status: true, expiresAt: true },
       });
-      return <InvalidInvitationView message="La invitación ha vencido y ya no puede usarse." />;
-    }
+      // Server Component evaluado una vez por request (sin doble-render ni
+      // memoización de React en cliente): se necesita la hora real para
+      // calcular la expiración de la invitación.
+      // eslint-disable-next-line react-hooks/purity
+      const now = Date.now();
 
-    return <InvitationRegistrationForm token={token} invitation={{ email: normalizeEmail(invitation.email), rut: normalizeRut(invitation.rut), role: invitation.role }} />;
+      if (!invitation) {
+        view = { kind: "invalid", message: "La invitación no existe, fue eliminada o no es válida." };
+      } else if (invitation.status !== "PENDING") {
+        view = { kind: "invalid", message: "Esta invitación ya fue utilizada o ya no está activa." };
+      } else if (new Date(invitation.expiresAt).getTime() < now) {
+        await prisma.internalUserInvitation.update({
+          where: { id: invitation.id },
+          data: { status: "EXPIRED" },
+        });
+        view = { kind: "invalid", message: "La invitación ha vencido y ya no puede usarse." };
+      } else {
+        view = {
+          kind: "form",
+          invitation: { email: normalizeEmail(invitation.email), rut: normalizeRut(invitation.rut), role: invitation.role },
+        };
+      }
+    }
   } catch (error) {
     console.error("Invitation page failed to load:", error);
-    return <DatabaseUnavailableView token={token} />;
+    view = { kind: "database-unavailable" };
   }
+
+  if (view.kind === "database-unavailable") return <DatabaseUnavailableView token={token} />;
+  if (view.kind === "invalid") return <InvalidInvitationView message={view.message} />;
+  return <InvitationRegistrationForm token={token} invitation={view.invitation} />;
 }

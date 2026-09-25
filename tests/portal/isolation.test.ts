@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { DomainError } from "../../lib/domain-error";
 import { ownedByCustomer } from "../../lib/portal/ownership";
 import { ownedResourceWhere, resourceBelongsToCustomer, scopedToCustomer } from "../../lib/portal/scope";

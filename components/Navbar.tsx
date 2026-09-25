@@ -24,9 +24,13 @@ export default function Navbar({ isCustomerLoggedIn = false }: { isCustomerLogge
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const accountHref = "/ingresar";
 
-  useEffect(() => {
+  // Cierra el menú móvil al cambiar de ruta, ajustando el estado durante el
+  // render (en vez de en un efecto) según react-hooks/set-state-in-effect.
+  const [lastPathname, setLastPathname] = useState(pathname);
+  if (pathname !== lastPathname) {
+    setLastPathname(pathname);
     setIsMenuOpen(false);
-  }, [pathname]);
+  }
 
   useEffect(() => {
     if (!isMenuOpen) return;
@@ -57,10 +61,9 @@ export default function Navbar({ isCustomerLoggedIn = false }: { isCustomerLogge
           <Image
             src="/images/logo-axessia.png"
             alt="Logo AXESSIA"
-            width={140}
+            width={138}
             height={46}
             priority
-            className="h-[2.875rem] w-auto"
           />
         </Link>
 

@@ -13,25 +13,40 @@ export default function ResetPasswordView() {
   const searchParams = useSearchParams();
   const token = searchParams.get("token")?.trim() ?? "";
 
-  const [status, setStatus] = useState<ResetStatus>("loading");
-  const [error, setError] = useState("");
+  const [status, setStatus] = useState<ResetStatus>(() => (token ? "loading" : "invalid"));
+  const [error, setError] = useState<string>(() =>
+    token ? "" : "El enlace de recuperación no es válido. Solicita uno nuevo desde el inicio de sesión.",
+  );
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
+  // El caso "sin token" se ajusta durante el render (no en un efecto) según
+  // react-hooks/set-state-in-effect; el efecto solo cubre la validación
+  // asíncrona real contra el servidor.
+  const [lastToken, setLastToken] = useState(token);
+  if (token !== lastToken) {
+    setLastToken(token);
     if (!token) {
       setStatus("invalid");
       setError("El enlace de recuperación no es válido. Solicita uno nuevo desde el inicio de sesión.");
-      return;
+    } else {
+      setStatus("loading");
+      setError("");
     }
+  }
+
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
 
     const validateToken = async () => {
       try {
         const response = await fetch(`/api/auth/reset-password?token=${encodeURIComponent(token)}`);
         const result = (await response.json()) as { valid?: boolean; error?: string };
+        if (cancelled) return;
 
         if (!response.ok || !result.valid) {
           setStatus("invalid");
@@ -41,12 +56,17 @@ export default function ResetPasswordView() {
 
         setStatus("valid");
       } catch {
-        setStatus("invalid");
-        setError("No fue posible validar el enlace de recuperación.");
+        if (!cancelled) {
+          setStatus("invalid");
+          setError("No fue posible validar el enlace de recuperación.");
+        }
       }
     };
 
     void validateToken();
+    return () => {
+      cancelled = true;
+    };
   }, [token]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {

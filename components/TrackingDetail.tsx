@@ -678,8 +678,9 @@ export default function TrackingDetail({ requestNumber }: { requestNumber: strin
                       Al aceptar, registramos tu decisión. Para continuar con el proceso posteriormente deberás proporcionar:
                     </p>
                     <ul className="mt-2 list-disc space-y-1 pl-5 text-sm font-semibold text-[var(--navy)]">
-                      <li>Fotocopia de tu cédula de identidad</li>
-                      <li>Poder notarial simple</li>
+                      <li>Receta médica</li>
+                      <li>Poder simple notarial del paciente o del tutor</li>
+                      <li>Fotocopia del carné de identidad de quien firma el poder</li>
                     </ul>
                     <p className="mt-2 text-xs leading-5 text-[var(--text-secondary)]">
                       Estos documentos no se solicitan en este paso.

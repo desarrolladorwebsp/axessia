@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect -- La consulta del reporte se reinicia cuando cambian sus filtros. */
+
 import { useEffect, useMemo, useState } from "react";
 import { BarChart3, Download, FileSpreadsheet, FileText, RefreshCw } from "lucide-react";
 import PageHeader from "../components/PageHeader";

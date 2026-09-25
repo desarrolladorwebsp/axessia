@@ -205,15 +205,17 @@ export default function CustomerDetailPage() {
   const [tab, setTab] = useState<TabId>("solicitudes");
   const [uploadCategory, setUploadCategory] = useState<CustomerDocumentUploadCategory | null>(null);
 
-  const loadCustomer = useCallback(async (showSkeleton = true) => {
+  // No se marca `isLoading`/`error` de forma síncrona antes del primer
+  // `await`: el estado inicial ya cubre la carga inicial (loading = true) y
+  // toda actualización de estado ocurre después de resolver el fetch.
+  const fetchCustomer = useCallback(async () => {
     try {
-      if (showSkeleton) setIsLoading(true);
-      setError("");
       const response = await fetch(`/api/customers/${params.id}`, { cache: "no-store" });
       if (!response.ok) {
         throw new Error(response.status === 404 ? "El cliente no existe o fue eliminado." : "No fue posible cargar el cliente.");
       }
       setData((await response.json()) as CustomerDetailResponse);
+      setError("");
     } catch (loadError) {
       setError(loadError instanceof Error ? loadError.message : "Error desconocido");
     } finally {
@@ -222,8 +224,12 @@ export default function CustomerDetailPage() {
   }, [params.id]);
 
   useEffect(() => {
-    void loadCustomer();
-  }, [loadCustomer]);
+    // Falso positivo conocido del linter (setState solo ocurre después de
+    // `await fetch(...)` dentro de `fetchCustomer`, nunca de forma síncrona):
+    // https://github.com/facebook/react/issues/34905
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    void fetchCustomer();
+  }, [fetchCustomer]);
 
   const nameParts = useMemo(() => splitStoredName(data?.customer.name ?? ""), [data?.customer.name]);
 
@@ -531,7 +537,7 @@ export default function CustomerDetailPage() {
           customerId={customer.id}
           requests={requests}
           onClose={() => setUploadCategory(null)}
-          onUploaded={() => void loadCustomer(false)}
+          onUploaded={() => void fetchCustomer()}
         />
       ) : null}
     </div>

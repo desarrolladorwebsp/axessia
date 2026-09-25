@@ -3,7 +3,7 @@ import { INTERNAL_SESSION_COOKIE, verifyInternalSessionToken } from "@/lib/auth"
 import { UserRole } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { cookies } from "next/headers";
-import { matchesSearchValue, normalizeSearchValue } from "@/lib/search";
+import { normalizeSearchValue } from "@/lib/search";
 
 export async function GET(request: NextRequest) {
   try {

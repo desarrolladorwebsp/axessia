@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { applyQuoteItemSuppliers, parseQuoteItems } from "../../lib/quote-items";
 
 describe("proveedor por producto de cotización", () => {

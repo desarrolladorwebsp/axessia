@@ -1,5 +1,7 @@
 "use client";
 
+/* eslint-disable react-hooks/set-state-in-effect -- El formulario se reinicia deliberadamente cada vez que se abre. */
+
 import { useEffect, useMemo, useState } from "react";
 import { HeartPulse, List, Pill, Plus, Search } from "lucide-react";
 import Modal from "../../components/Modal";

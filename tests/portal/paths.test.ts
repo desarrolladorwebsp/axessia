@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { describe, it } from "vitest";
 import { PORTAL_HOME_PATH, PORTAL_PROFILE_PATH, portalHomePath, portalRequestDetailPath } from "../../lib/portal/paths";
 
 describe("rutas del portal centradas en solicitudes", () => {

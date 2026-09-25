@@ -8,10 +8,12 @@ import { normalizeSearchValue } from "@/lib/search";
 import { getInternalActor } from "@/lib/internal-access";
 import { attachProductCosts } from "@/lib/product-costs";
 import { quotePriceBreakdownFromItems } from "@/lib/quote-pricing";
+import { isValidRut, normalizeCustomerName, normalizeEmail, normalizeRut } from "@/lib/customer-validation";
 
 const quoteStatuses = ["DRAFT", "READY", "SENT", "ACCEPTED", "REJECTED", "EXPIRED", "VOIDED"] as const;
 
-type QuotePayload = { requestId?: unknown; validUntil?: unknown; estimatedShippingDays?: unknown; items?: unknown; asDraft?: unknown };
+type DirectCustomerPayload = { name?: unknown; email?: unknown; rut?: unknown; phone?: unknown; city?: unknown };
+type QuotePayload = { requestId?: unknown; directCustomer?: DirectCustomerPayload; validUntil?: unknown; estimatedShippingDays?: unknown; items?: unknown; asDraft?: unknown };
 
 function invalid(message: string) {
   return NextResponse.json({ error: message }, { status: 400 });
@@ -24,8 +26,9 @@ export async function POST(request: NextRequest) {
     const payload = (await request.json()) as QuotePayload;
     const asDraft = payload.asDraft === true;
     const requestId = typeof payload.requestId === "string" ? payload.requestId.trim() : "";
+    const directCustomer = payload.directCustomer;
     const rawItems = Array.isArray(payload.items) ? payload.items as QuoteItemPayload[] : [];
-    if (!requestId) return invalid("La solicitud es obligatoria");
+    if (!requestId && !directCustomer) return invalid("La solicitud o los datos del cliente son obligatorios");
     if (!rawItems.length) return invalid("Agrega al menos un producto a la cotización");
 
     let validUntil: Date | null;
@@ -87,7 +90,38 @@ export async function POST(request: NextRequest) {
     }
 
     const quote = await prisma.$transaction(async (transaction) => {
-      const source = await transaction.quoteRequest.findUnique({ where: { id: requestId }, select: { id: true, status: true, productType: true, customerId: true, assignedExecutiveId: true, requesterName: true, requesterPhone: true, requesterEmail: true, requesterRut: true, requesterCity: true } });
+      let source = requestId
+        ? await transaction.quoteRequest.findUnique({ where: { id: requestId }, select: { id: true, status: true, productType: true, customerId: true, assignedExecutiveId: true, requesterName: true, requesterPhone: true, requesterEmail: true, requesterRut: true, requesterCity: true } })
+        : null;
+
+      if (!requestId && directCustomer) {
+        const name = normalizeCustomerName(typeof directCustomer.name === "string" ? directCustomer.name : "");
+        const email = normalizeEmail(typeof directCustomer.email === "string" ? directCustomer.email : "");
+        const rut = normalizeRut(typeof directCustomer.rut === "string" ? directCustomer.rut : "");
+        const phone = typeof directCustomer.phone === "string" ? directCustomer.phone.trim() : "";
+        const city = typeof directCustomer.city === "string" ? directCustomer.city.trim() : "";
+        if (!name || !email || !rut || !phone || !city) throw new Error("Completa todos los datos del cliente");
+        if (!/^\S+@\S+\.\S+$/.test(email)) throw new Error("Revisa el formato del correo");
+        if (!isValidRut(rut)) throw new Error("El RUT ingresado no es válido");
+
+        const matches = await transaction.customer.findMany({ where: { OR: [{ email }, { rut }] }, select: { id: true, email: true, rut: true } });
+        if (matches.length > 1 || (matches[0] && (matches[0].email !== email || normalizeRut(matches[0].rut) !== rut))) {
+          throw new Error("El correo o RUT pertenece a otro cliente. Revisa los datos ingresados");
+        }
+        const customer = matches[0]
+          ? await transaction.customer.update({ where: { id: matches[0].id }, data: { name, phone, city }, select: { id: true } })
+          : await transaction.customer.create({ data: { name, email, rut, phone, city }, select: { id: true } });
+        const initialProductType = isProductType(rawItems[0]?.productType) ? rawItems[0].productType : "MEDICATION";
+        const createdRequest = await transaction.quoteRequest.create({
+          data: { customerId: customer.id, requesterName: name, requesterPhone: phone, requesterEmail: email, requesterRut: rut, requesterCity: city, status: asDraft ? "RECEIVED" : "QUOTED", origin: "DIRECT_QUOTE", productType: initialProductType, assignedExecutiveId: actor.id, acceptsPolicies: true, acceptsDataTreatment: true },
+          select: { id: true, sequence: true, status: true, productType: true, customerId: true, assignedExecutiveId: true, requesterName: true, requesterPhone: true, requesterEmail: true, requesterRut: true, requesterCity: true },
+        });
+        source = await transaction.quoteRequest.update({
+          where: { id: createdRequest.id },
+          data: { requestNumber: `D-${100000 + createdRequest.sequence}` },
+          select: { id: true, status: true, productType: true, customerId: true, assignedExecutiveId: true, requesterName: true, requesterPhone: true, requesterEmail: true, requesterRut: true, requesterCity: true },
+        });
+      }
       if (!source) throw new Error("Solicitud no encontrada");
       try {
         items = parseQuoteItems(rawItems, asDraft, source.productType);
@@ -119,20 +153,21 @@ export async function POST(request: NextRequest) {
       if (!customerId) {
         const existingCustomer = await transaction.customer.findFirst({ where: { OR: [{ email: source.requesterEmail }, { rut: source.requesterRut }] }, select: { id: true } });
         customerId = existingCustomer?.id ?? (await transaction.customer.create({ data: { name: source.requesterName, phone: source.requesterPhone, email: source.requesterEmail, rut: source.requesterRut, city: source.requesterCity }, select: { id: true } })).id;
-        await transaction.quoteRequest.update({ where: { id: requestId }, data: { customerId } });
+        await transaction.quoteRequest.update({ where: { id: source.id }, data: { customerId } });
       }
-      const latest = await transaction.quote.findFirst({ where: { requestId }, orderBy: { version: "desc" }, select: { version: true } });
-      const created = await transaction.quote.create({ data: { customerId, requestId, version: (latest?.version ?? 0) + 1, status, total, validUntil, estimatedShippingDays, items: { create: items as never } }, include: { items: { include: { supplier: { select: { id: true, name: true } } } }, customer: { select: { id: true, name: true, email: true } }, request: { select: { id: true, requestNumber: true, requesterName: true, requesterEmail: true } } } });
+      const effectiveRequestId = source.id;
+      const latest = await transaction.quote.findFirst({ where: { requestId: effectiveRequestId }, orderBy: { version: "desc" }, select: { version: true } });
+      const created = await transaction.quote.create({ data: { customerId, requestId: effectiveRequestId, version: (latest?.version ?? 0) + 1, status, total, validUntil, estimatedShippingDays, items: { create: items as never } }, include: { items: { include: { supplier: { select: { id: true, name: true } } } }, customer: { select: { id: true, name: true, email: true } }, request: { select: { id: true, requestNumber: true, requesterName: true, requesterEmail: true } } } });
       const numbered = await transaction.quote.update({ where: { id: created.id }, data: { quoteNumber: `C-${10000 + created.sequence}` }, include: { items: { include: { supplier: { select: { id: true, name: true } } } }, customer: { select: { id: true, name: true, email: true } }, request: { select: { id: true, requestNumber: true, requesterName: true, requesterEmail: true } } } });
       if (!asDraft) {
-        await transaction.quoteRequest.update({ where: { id: requestId }, data: { status: "QUOTED" } });
-        await transaction.quoteRequestEvent.create({ data: { requestId, status: "QUOTED", eventType: "QUOTE_CREATED" } });
+        await transaction.quoteRequest.update({ where: { id: effectiveRequestId }, data: { status: "QUOTED" } });
+        await transaction.quoteRequestEvent.create({ data: { requestId: effectiveRequestId, status: "QUOTED", eventType: "QUOTE_CREATED" } });
       }
       return numbered;
     }, { maxWait: 10000, timeout: 20000 });
     return NextResponse.json({ ...quote, total: quote.total?.toString() ?? null, validUntil: quote.validUntil?.toISOString() ?? null, createdAt: quote.createdAt.toISOString(), updatedAt: quote.updatedAt.toISOString() }, { status: 201 });
   } catch (error) {
-    if (error instanceof Error && (error.message === "Solicitud no encontrada" || error.message.startsWith("Producto") || error.message === "La solicitud no está disponible para crear una cotización")) return NextResponse.json({ error: error.message }, { status: error.message === "Solicitud no encontrada" ? 404 : error.message === "La solicitud no está disponible para crear una cotización" ? 409 : 400 });
+    if (error instanceof Error && (error.message === "Solicitud no encontrada" || error.message.startsWith("Producto") || error.message.startsWith("Completa") || error.message.startsWith("Revisa") || error.message.startsWith("El RUT") || error.message.startsWith("El correo") || error.message === "La solicitud no está disponible para crear una cotización")) return NextResponse.json({ error: error.message }, { status: error.message === "Solicitud no encontrada" ? 404 : error.message === "La solicitud no está disponible para crear una cotización" ? 409 : 400 });
     console.error("Error creating quote:", error);
     return NextResponse.json({ error: "Error al crear la cotización" }, { status: 500 });
   }
@@ -196,6 +231,7 @@ export async function GET(request: NextRequest) {
             select: {
               id: true,
               requestNumber: true,
+              origin: true,
               requesterName: true,
               requesterEmail: true,
               customer: { select: { name: true, email: true } },
