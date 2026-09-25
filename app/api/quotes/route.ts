@@ -105,11 +105,10 @@ export async function POST(request: NextRequest) {
         if (!isValidRut(rut)) throw new Error("El RUT ingresado no es válido");
 
         const matches = await transaction.customer.findMany({ where: { OR: [{ email }, { rut }] }, select: { id: true, email: true, rut: true } });
-        if (matches.length > 1 || (matches[0] && (matches[0].email !== email || normalizeRut(matches[0].rut) !== rut))) {
-          throw new Error("El correo o RUT pertenece a otro cliente. Revisa los datos ingresados");
-        }
-        const customer = matches[0]
-          ? await transaction.customer.update({ where: { id: matches[0].id }, data: { name, phone, city }, select: { id: true } })
+        const existingCustomer = matches.find((customer) => normalizeRut(customer.rut) === rut)
+          ?? matches.find((customer) => customer.email === email);
+        const customer = existingCustomer
+          ? await transaction.customer.update({ where: { id: existingCustomer.id }, data: { name, phone, city }, select: { id: true } })
           : await transaction.customer.create({ data: { name, email, rut, phone, city }, select: { id: true } });
         const initialProductType = isProductType(rawItems[0]?.productType) ? rawItems[0].productType : "MEDICATION";
         const createdRequest = await transaction.quoteRequest.create({
